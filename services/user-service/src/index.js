@@ -10,6 +10,7 @@ dotenv.config();
 // Import plugins
 import prismaPlugin from './plugins/prisma.js';
 import authPlugin from './plugins/auth.js';
+import correlationIdPlugin from './plugins/correlation-id.js';
 
 // Import routes
 import userRoutes from './routes/users.js';
@@ -70,16 +71,33 @@ await fastify.register(swaggerUi, {
 });
 
 // Register custom plugins
+await fastify.register(correlationIdPlugin);
 await fastify.register(prismaPlugin);
 await fastify.register(authPlugin);
 
-// Health check endpoint
+// Health check endpoint with database connectivity check
 fastify.get('/health', async (request, reply) => {
-  return {
-    success: true,
-    message: 'User service is healthy',
-    timestamp: new Date().toISOString(),
-  };
+  try {
+    // Check database connectivity by executing a simple query
+    await fastify.prisma.$queryRaw`SELECT 1`;
+    
+    request.log.info('Health check passed');
+    
+    return reply.status(200).send({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      database: 'connected',
+    });
+  } catch (error) {
+    request.log.error({ err: error }, 'Health check failed - database connection error');
+    
+    return reply.status(503).send({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      database: 'disconnected',
+      error: error.message,
+    });
+  }
 });
 
 // Register API routes

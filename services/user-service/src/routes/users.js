@@ -174,6 +174,8 @@ export default async function userRoutes(fastify, options) {
   fastify.post('/', { schema: createUserSchema }, async (request, reply) => {
     const { email, password, name } = request.body;
 
+    request.log.info({ email, name }, 'Creating new user');
+
     try {
       // Check if user already exists
       const existingUser = await fastify.prisma.user.findUnique({
@@ -181,6 +183,7 @@ export default async function userRoutes(fastify, options) {
       });
 
       if (existingUser) {
+        request.log.warn({ email }, 'User creation failed - email already exists');
         return reply.status(409).send({
           success: false,
           message: 'User with this email already exists',
@@ -215,6 +218,8 @@ export default async function userRoutes(fastify, options) {
       // Remove password from response
       const { password: _, ...userWithoutPassword } = user;
 
+      request.log.info({ user_id: user.id, email: user.email }, 'User created successfully');
+
       return reply.status(201).send({
         success: true,
         message: 'User created successfully',
@@ -224,7 +229,7 @@ export default async function userRoutes(fastify, options) {
         },
       });
     } catch (error) {
-      fastify.log.error('Error creating user:', error);
+      request.log.error({ err: error, email }, 'Error creating user');
       return reply.status(500).send({
         success: false,
         message: 'Internal server error',
@@ -237,6 +242,8 @@ export default async function userRoutes(fastify, options) {
   fastify.post('/login', { schema: loginSchema }, async (request, reply) => {
     const { email, password } = request.body;
 
+    request.log.info({ email }, 'User login attempt');
+
     try {
       // Find user by email
       const user = await fastify.prisma.user.findUnique({
@@ -247,6 +254,7 @@ export default async function userRoutes(fastify, options) {
       });
 
       if (!user) {
+        request.log.warn({ email }, 'Login failed - user not found');
         return reply.status(401).send({
           success: false,
           message: 'Invalid email or password',
@@ -257,6 +265,7 @@ export default async function userRoutes(fastify, options) {
       const isPasswordValid = await comparePassword(password, user.password);
 
       if (!isPasswordValid) {
+        request.log.warn({ email, user_id: user.id }, 'Login failed - invalid password');
         return reply.status(401).send({
           success: false,
           message: 'Invalid email or password',
@@ -269,6 +278,8 @@ export default async function userRoutes(fastify, options) {
       // Remove password from response
       const { password: _, ...userWithoutPassword } = user;
 
+      request.log.info({ user_id: user.id, email: user.email }, 'User logged in successfully');
+
       return reply.status(200).send({
         success: true,
         message: 'Login successful',
@@ -278,7 +289,7 @@ export default async function userRoutes(fastify, options) {
         },
       });
     } catch (error) {
-      fastify.log.error('Error logging in:', error);
+      request.log.error({ err: error, email }, 'Error during login');
       return reply.status(500).send({
         success: false,
         message: 'Internal server error',
@@ -291,6 +302,8 @@ export default async function userRoutes(fastify, options) {
   fastify.get('/:user_id', { schema: getUserSchema }, async (request, reply) => {
     const { user_id } = request.params;
 
+    request.log.info({ user_id }, 'Retrieving user profile');
+
     try {
       const user = await fastify.prisma.user.findUnique({
         where: { id: user_id },
@@ -300,6 +313,7 @@ export default async function userRoutes(fastify, options) {
       });
 
       if (!user) {
+        request.log.warn({ user_id }, 'User profile retrieval failed - user not found');
         return reply.status(404).send({
           success: false,
           message: 'User not found',
@@ -309,13 +323,15 @@ export default async function userRoutes(fastify, options) {
       // Remove password from response
       const { password: _, ...userWithoutPassword } = user;
 
+      request.log.info({ user_id }, 'User profile retrieved successfully');
+
       return reply.status(200).send({
         success: true,
         message: 'User profile retrieved successfully',
         data: userWithoutPassword,
       });
     } catch (error) {
-      fastify.log.error('Error retrieving user profile:', error);
+      request.log.error({ err: error, user_id }, 'Error retrieving user profile');
       return reply.status(500).send({
         success: false,
         message: 'Internal server error',
@@ -336,8 +352,11 @@ export default async function userRoutes(fastify, options) {
       const updates = request.body;
 
       try {
+        request.log.info({ user_id, updates }, 'Updating user profile');
+
         // Verify the authenticated user matches the user_id
         if (request.user.user_id !== user_id) {
+          request.log.warn({ user_id, authenticated_user_id: request.user.user_id }, 'User update failed - unauthorized');
           return reply.status(403).send({
             success: false,
             message: 'You can only update your own profile',
@@ -364,6 +383,8 @@ export default async function userRoutes(fastify, options) {
         // Remove password from response
         const { password: _, ...userWithoutPassword } = user;
 
+        request.log.info({ user_id }, 'User profile updated successfully');
+
         return reply.status(200).send({
           success: true,
           message: 'User updated successfully',
@@ -371,13 +392,14 @@ export default async function userRoutes(fastify, options) {
         });
       } catch (error) {
         if (error.code === 'P2025') {
+          request.log.warn({ user_id }, 'User update failed - user not found');
           return reply.status(404).send({
             success: false,
             message: 'User not found',
           });
         }
 
-        fastify.log.error('Error updating user:', error);
+        request.log.error({ err: error, user_id }, 'Error updating user');
         return reply.status(500).send({
           success: false,
           message: 'Internal server error',
@@ -399,8 +421,11 @@ export default async function userRoutes(fastify, options) {
       const preferences = request.body;
 
       try {
+        request.log.info({ user_id, preferences }, 'Updating notification preferences');
+
         // Verify the authenticated user matches the user_id
         if (request.user.user_id !== user_id) {
+          request.log.warn({ user_id, authenticated_user_id: request.user.user_id }, 'Preferences update failed - unauthorized');
           return reply.status(403).send({
             success: false,
             message: 'You can only update your own preferences',
@@ -434,6 +459,8 @@ export default async function userRoutes(fastify, options) {
           },
         });
 
+        request.log.info({ user_id }, 'Notification preferences updated successfully');
+
         return reply.status(200).send({
           success: true,
           message: 'Notification preferences updated successfully',
@@ -448,7 +475,7 @@ export default async function userRoutes(fastify, options) {
           },
         });
       } catch (error) {
-        fastify.log.error('Error updating notification preferences:', error);
+        request.log.error({ err: error, user_id }, 'Error updating notification preferences');
         return reply.status(500).send({
           success: false,
           message: 'Internal server error',

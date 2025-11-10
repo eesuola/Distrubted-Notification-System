@@ -17,8 +17,35 @@ Microservice for user management and authentication in the Distributed Notificat
 - User profile management
 - Push token management for notifications
 - Notification preferences management (email, push, sms)
+- **Health check with database connectivity monitoring**
+- **Distributed tracing with correlation IDs**
+- **Structured logging with Pino**
 
 ## API Endpoints
+
+### Health Check
+- **GET** `/health`
+- **Description**: Check service health and database connectivity
+- **Auth**: Not required
+- **Response** (200 - Healthy):
+  ```json
+  {
+    "status": "ok",
+    "timestamp": "2024-01-01T00:00:00.000Z",
+    "database": "connected"
+  }
+  ```
+- **Response** (503 - Unhealthy):
+  ```json
+  {
+    "status": "error",
+    "timestamp": "2024-01-01T00:00:00.000Z",
+    "database": "disconnected",
+    "error": "Connection error message"
+  }
+  ```
+
+### User Management
 
 ### 1. Create User
 - **POST** `/api/v1/users/`
@@ -278,6 +305,54 @@ Create a new migration:
 npm run prisma:migrate
 ```
 
+## Distributed Tracing
+
+The service supports distributed tracing using correlation IDs:
+
+### How It Works
+1. When the API Gateway (or any client) makes a request, it can include an `x-correlation-id` header
+2. If the header is present, the service uses that correlation ID
+3. If not present, the service generates a new UUID as the correlation ID
+4. The correlation ID is:
+   - Included in all log entries for that request
+   - Returned in the response headers as `x-correlation-id`
+   - Used to trace a single notification across all microservices
+
+### Example Usage
+```bash
+curl -H "x-correlation-id: 123e4567-e89b-12d3-a456-426614174000" \
+     http://localhost:3001/api/v1/users/login \
+     -X POST -H "Content-Type: application/json" \
+     -d '{"email":"user@example.com","password":"password123"}'
+```
+
+All logs for this request will include `correlation_id: 123e4567-e89b-12d3-a456-426614174000`, making it easy to trace the entire request flow across services.
+
+## Structured Logging
+
+The service uses **Pino** for structured JSON logging:
+
+- **Development**: Pretty-printed logs with timestamps
+- **Production**: JSON-formatted logs for log aggregation systems
+- **Correlation IDs**: Automatically included in all log entries
+- **Request Context**: Each log includes relevant request data (user_id, email, etc.)
+
+### Log Levels
+- `info`: Normal operations (user login, profile updates, etc.)
+- `warn`: Warning conditions (failed login attempts, unauthorized access, etc.)
+- `error`: Error conditions (database errors, unexpected failures, etc.)
+
+### Sample Log Entry
+```json
+{
+  "level": 30,
+  "time": 1704067200000,
+  "correlation_id": "123e4567-e89b-12d3-a456-426614174000",
+  "email": "user@example.com",
+  "msg": "User login attempt"
+}
+```
+
 ## Security Features
 
 - **Password Hashing**: bcrypt with 10 salt rounds
@@ -288,11 +363,15 @@ npm run prisma:migrate
 
 ## Architecture
 
-- **Fastify Plugins**: Modular plugin architecture for Prisma and Auth
+- **Fastify Plugins**: Modular plugin architecture
+  - `prisma.js`: Database connection and Prisma client management
+  - `auth.js`: JWT authentication and token generation
+  - `correlation-id.js`: **NEW** - Distributed tracing with correlation IDs
 - **JSON Schema Validation**: Type-safe request/response validation
 - **Prisma ORM**: Type-safe database access with PostgreSQL
 - **Swagger Documentation**: Auto-generated API documentation
 - **Graceful Shutdown**: Proper cleanup of database connections
+- **Structured Logging**: Pino logger with correlation ID tracking
 
 ## Error Handling
 
@@ -328,6 +407,25 @@ All responses follow a consistent format:
 | `CORS_ORIGIN` | CORS allowed origins | `*` |
 | `LOG_LEVEL` | Logging level | `info` |
 
+## Monitoring & Operations
+
+### Health Checks
+The `/health` endpoint is vital for monitoring and should be configured in your:
+- Load balancer health checks
+- Container orchestration (Kubernetes liveness/readiness probes)
+- Monitoring systems (Prometheus, DataDog, etc.)
+
+### Logging Best Practices
+1. Always include the `x-correlation-id` header from the API Gateway
+2. Use correlation IDs to trace requests across all services
+3. Monitor logs for `warn` and `error` levels
+4. Set `LOG_LEVEL=debug` for troubleshooting
+
 ## Notes for API Gateway
 
 The **GET /api/v1/users/:user_id/** endpoint is designed to be called by the API Gateway without authentication. This allows the gateway to retrieve user information for internal operations while protecting other endpoints with JWT authentication.
+
+### Important for Integration
+1. **Always pass `x-correlation-id`**: When the API Gateway makes requests to this service, it should pass the correlation ID in the header
+2. **No synchronous calls**: This service does not make synchronous HTTP calls to other services - it only interacts with its own PostgreSQL database
+3. **Async-ready**: All operations are asynchronous and non-blocking
