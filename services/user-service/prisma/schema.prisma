@@ -11,25 +11,28 @@ datasource db {
 }
 
 model User {
-  id                       String                    @id @default(uuid())
-  email                    String                    @unique
-  password                 String
-  name                     String
-  push_token               String?
-  notification_preferences NotificationPreferences?
-  created_at               DateTime                  @default(now())
-  updated_at               DateTime                  @updatedAt
+  id          String          @id @default(cuid())
+  name        String
+  email       String          @unique
+  password    String          // Hashed!
+  push_token  String?         // Optional
+  created_at  DateTime        @default(now())
+  updated_at  DateTime        @updatedAt
+
+  // One-to-one relationship
+  preferences UserPreference?
 
   @@map("users")
 }
 
-model NotificationPreferences {
-  id      String  @id @default(uuid())
+model UserPreference {
+  id      String  @id @default(cuid())
   user_id String  @unique
-  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
   email   Boolean @default(true)
   push    Boolean @default(true)
-  sms     Boolean @default(false)
 
-  @@map("notification_preferences")
+  // Relation back to the User
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
 }
