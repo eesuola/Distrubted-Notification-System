@@ -1,0 +1,15 @@
+{
+  "name": "distrubted-notification-system",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "services/*"
+  ],
+  "scripts": {
+    "build": "npm -ws run build",
+    "start": "npm -ws run start",
+    "lint": "npm -ws run lint"
+  }
+}
+
+
