@@ -13,7 +13,7 @@ datasource db {
 model Template {
   id            String   @id @default(uuid())
   template_code String
-  language      String
+  language      String   @default("en")
   subject       String?
   content       String
   version       Int      @default(1)

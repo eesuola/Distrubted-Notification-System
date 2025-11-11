@@ -16,7 +16,7 @@ const templateResponseSchema = {
 const createTemplateSchema = {
   body: {
     type: 'object',
-    required: ['template_code', 'language', 'content'],
+    required: ['template_code', 'content'],
     properties: {
       template_code: { 
         type: 'string',
@@ -74,7 +74,7 @@ const createTemplateVersionSchema = {
   },
   body: {
     type: 'object',
-    required: ['language', 'content'],
+    required: ['content'],
     properties: {
       language: { 
         type: 'string',
@@ -123,7 +123,7 @@ export default async function templateRoutes(fastify, options) {
   
   // POST /api/v1/templates/ - Create a brand new template (first version)
   fastify.post('/', { schema: createTemplateSchema }, async (request, reply) => {
-    const { template_code, language, subject, content } = request.body;
+    const { template_code, language = 'en', subject, content } = request.body;
 
     try {
       // Check if a template with this code and language already exists
@@ -146,10 +146,11 @@ export default async function templateRoutes(fastify, options) {
       }
 
       // Create new template with version 1
+      // If language is not provided, Prisma will use database default ('en')
       const template = await fastify.prisma.template.create({
         data: {
           template_code,
-          language,
+          ...(language !== 'en' && { language }), // Only set if not default
           subject: subject || null,
           content,
           version: 1,
@@ -422,7 +423,7 @@ export default async function templateRoutes(fastify, options) {
   // POST /api/v1/templates/:template_code/versions/ - Create a new version of an existing template
   fastify.post('/:template_code/versions/', { schema: createTemplateVersionSchema }, async (request, reply) => {
     const { template_code } = request.params;
-    const { language, subject, content } = request.body;
+    const { language = 'en', subject, content } = request.body;
 
     try {
       // 1. Find the template with template_code and language, get the latest version
@@ -449,10 +450,11 @@ export default async function templateRoutes(fastify, options) {
       const newVersion = currentVersion + 1;
 
       // 3. Create a new record with the new content and incremented version
+      // If language is not provided, Prisma will use database default ('en')
       const newTemplate = await fastify.prisma.template.create({
         data: {
           template_code,
-          language,
+          ...(language !== 'en' && { language }), // Only set if not default
           subject: subject !== undefined ? subject : latestTemplate.subject,
           content,
           version: newVersion,
