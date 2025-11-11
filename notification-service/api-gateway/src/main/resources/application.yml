@@ -1,0 +1,67 @@
+spring:
+  application:
+    name: api-gateway
+  datasource:
+    url: jdbc:postgresql:${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:api-gateway}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASS:password}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+
+  rabbitmq:
+    host: ${RABBIT_HOST:localhost}
+    port: ${RABBIT_PORT:5672}
+    username: ${RABBIT_USER:guest}
+    password: ${RABBIT_PASS:guest}
+
+  cloud:
+    consul:
+      host: ${CONSUL_HOST:localhost}
+      port: ${CONSUL_PORT:8500}
+      discovery:
+        enabled: true
+        register: true
+
+server:
+  port: ${PORT:8080}
+
+security:
+  oauth2:
+    resourceserver:
+      jwt:
+        jwt-set-uri: ${JWK_SET_URI:http://localhost:8080/realms/myrealm/protocol/openid-connect/certs}
+        issuer-uri: ${JWT_ISSUER_URI:http://localhost:8080/realms/myrealm}
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        slidingWindowSize: 50
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 5
+  retry:
+    instances:
+      userClient:
+        maxAttempts: 3
+        waitDuration: 500ms
+
+notification:
+  rabbit:
+    exchange: notifications.direct
+    emailRoutingKey: email
+    pushRoutingKey: push
+
+logging:
+  level:
+    root: INFO
+    hng13_api_gateway: DEBUG
+
