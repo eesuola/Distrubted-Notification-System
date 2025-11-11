@@ -157,6 +157,11 @@ export default async function templateRoutes(fastify, options) {
         },
       });
 
+      // Cache the new template for 1 hour (3600 seconds)
+      const cacheKey = fastify.getTemplateCacheKey(template_code, language);
+      await fastify.cacheTemplate(cacheKey, template, 3600);
+      request.log.info(`Cached new template: ${template_code} (${language})`);
+
       return reply.status(201).send({
         success: true,
         message: 'Template created successfully',
@@ -228,24 +233,40 @@ export default async function templateRoutes(fastify, options) {
     const { language = 'en' } = request.query;
 
     try {
-      // Query the database for the template with template_code and language
-      // Order the results by version in descending order
-      // Return the single record with the highest version number
-      const template = await fastify.prisma.template.findFirst({
-        where: {
-          template_code,
-          language,
-        },
-        orderBy: {
-          version: 'desc',
-        },
-      });
-
+      // Generate cache key for this template
+      const cacheKey = fastify.getTemplateCacheKey(template_code, language);
+      
+      // Try to get template from Redis cache first
+      let template = await fastify.getCachedTemplate(cacheKey);
+      
       if (!template) {
-        return reply.status(404).send({
-          success: false,
-          message: `Template '${template_code}' not found for language '${language}'`,
+        request.log.info(`Cache miss for template: ${template_code} (${language})`);
+        
+        // Query the database for the template with template_code and language
+        // Order the results by version in descending order
+        // Return the single record with the highest version number
+        template = await fastify.prisma.template.findFirst({
+          where: {
+            template_code,
+            language,
+          },
+          orderBy: {
+            version: 'desc',
+          },
         });
+
+        if (!template) {
+          return reply.status(404).send({
+            success: false,
+            message: `Template '${template_code}' not found for language '${language}'`,
+          });
+        }
+
+        // Cache the template for 1 hour (3600 seconds)
+        await fastify.cacheTemplate(cacheKey, template, 3600);
+        request.log.info(`Cached template: ${template_code} (${language})`);
+      } else {
+        request.log.info(`Cache hit for template: ${template_code} (${language})`);
       }
 
       return reply.status(200).send({
@@ -255,7 +276,7 @@ export default async function templateRoutes(fastify, options) {
       });
       
     } catch (error) {
-      fastify.log.error('Error retrieving latest template:', error);
+      request.log.error('Error retrieving latest template:', error);
       return reply.status(500).send({
         success: false,
         message: 'Internal server error',
@@ -315,22 +336,38 @@ export default async function templateRoutes(fastify, options) {
     const { language = 'en' } = request.query;
 
     try {
-      // Query the database for the exact record matching template_code, language, and version
-      const template = await fastify.prisma.template.findUnique({
-        where: {
-          template_code_language_version: {
-            template_code,
-            language,
-            version: parseInt(version, 10),
-          },
-        },
-      });
-
+      // Generate cache key for this specific template version
+      const cacheKey = fastify.getTemplateVersionCacheKey(template_code, version, language);
+      
+      // Try to get template from Redis cache first
+      let template = await fastify.getCachedTemplate(cacheKey);
+      
       if (!template) {
-        return reply.status(404).send({
-          success: false,
-          message: `Template '${template_code}' version ${version} not found for language '${language}'`,
+        request.log.info(`Cache miss for template version: ${template_code} v${version} (${language})`);
+        
+        // Query the database for the exact record matching template_code, language, and version
+        template = await fastify.prisma.template.findUnique({
+          where: {
+            template_code_language_version: {
+              template_code,
+              language,
+              version: parseInt(version, 10),
+            },
+          },
         });
+
+        if (!template) {
+          return reply.status(404).send({
+            success: false,
+            message: `Template '${template_code}' version ${version} not found for language '${language}'`,
+          });
+        }
+
+        // Cache the template version for 1 hour (3600 seconds)
+        await fastify.cacheTemplate(cacheKey, template, 3600);
+        request.log.info(`Cached template version: ${template_code} v${version} (${language})`);
+      } else {
+        request.log.info(`Cache hit for template version: ${template_code} v${version} (${language})`);
       }
 
       return reply.status(200).send({
@@ -340,7 +377,7 @@ export default async function templateRoutes(fastify, options) {
       });
       
     } catch (error) {
-      fastify.log.error('Error retrieving specific template version:', error);
+      request.log.error('Error retrieving specific template version:', error);
       return reply.status(500).send({
         success: false,
         message: 'Internal server error',
@@ -460,6 +497,10 @@ export default async function templateRoutes(fastify, options) {
           version: newVersion,
         },
       });
+
+      // Invalidate cache for this template since we created a new version
+      await fastify.invalidateTemplateCache(template_code, language);
+      request.log.info(`Invalidated cache for template: ${template_code} (${language})`);
 
       return reply.status(201).send({
         success: true,

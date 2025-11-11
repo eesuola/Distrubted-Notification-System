@@ -9,6 +9,8 @@ dotenv.config();
 
 // Import plugins
 import prismaPlugin from './plugins/prisma.js';
+import redisPlugin from './plugins/redis.js';
+import correlationIdPlugin from './plugins/correlation-id.js';
 
 // Import routes
 import templateRoutes from './routes/templates.js';
@@ -62,14 +64,43 @@ await fastify.register(swaggerUi, {
 
 // Register custom plugins
 await fastify.register(prismaPlugin);
+await fastify.register(redisPlugin);
+await fastify.register(correlationIdPlugin);
 
 // Health check endpoint
 fastify.get('/health', async (request, reply) => {
-  return {
+  const health = {
     success: true,
     message: 'Template service is healthy',
     timestamp: new Date().toISOString(),
+    services: {
+      database: 'unknown',
+      redis: 'unknown',
+    },
   };
+
+  try {
+    // Check PostgreSQL connection
+    await fastify.prisma.$queryRaw`SELECT 1`;
+    health.services.database = 'connected';
+  } catch (error) {
+    request.log.error('Database health check failed:', error);
+    health.services.database = 'disconnected';
+    health.success = false;
+  }
+
+  try {
+    // Check Redis connection
+    await fastify.redis.ping();
+    health.services.redis = 'connected';
+  } catch (error) {
+    request.log.error('Redis health check failed:', error);
+    health.services.redis = 'disconnected';
+    health.success = false;
+  }
+
+  const statusCode = health.success ? 200 : 503;
+  return reply.status(statusCode).send(health);
 });
 
 // Register API routes

@@ -16,9 +16,11 @@
     "@fastify/cors": "^8.5.0",
     "@fastify/swagger": "^8.13.0",
     "@fastify/swagger-ui": "^2.1.0",
+    "@fastify/redis": "^6.1.1",
     "@prisma/client": "^5.7.0",
     "fastify-plugin": "^4.5.1",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "redis": "^4.6.10"
   },
   "devDependencies": {
     "prisma": "^5.7.0",
