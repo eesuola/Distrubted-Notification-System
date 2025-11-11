@@ -1,3 +1,7 @@
+// Import shared response utility
+import responseUtils from '../../../../shared/response.js';
+const { createResponse } = responseUtils;
+
 // JSON Schemas for request/response validation
 const templateResponseSchema = {
   type: 'object',
@@ -139,10 +143,10 @@ export default async function templateRoutes(fastify, options) {
 
       // If template exists, return 409 Conflict
       if (existingTemplate) {
-        return reply.status(409).send({
-          success: false,
-          message: 'Template with this code and language already exists. Use the /versions endpoint to create a new version.',
-        });
+        return reply.status(409).send(createResponse(
+          false,
+          'Template with this code and language already exists. Use the /versions endpoint to create a new version.'
+        ));
       }
 
       // Create new template with version 1
@@ -162,28 +166,29 @@ export default async function templateRoutes(fastify, options) {
       await fastify.cacheTemplate(cacheKey, template, 3600);
       request.log.info(`Cached new template: ${template_code} (${language})`);
 
-      return reply.status(201).send({
-        success: true,
-        message: 'Template created successfully',
-        data: template,
-      });
+      return reply.status(201).send(createResponse(
+        true,
+        'Template created successfully',
+        template
+      ));
       
     } catch (error) {
       fastify.log.error('Error creating template:', error);
       
       // Handle Prisma unique constraint violation (just in case)
       if (error.code === 'P2002') {
-        return reply.status(409).send({
-          success: false,
-          message: 'Template with this code, language, and version already exists.',
-        });
+        return reply.status(409).send(createResponse(
+          false,
+          'Template with this code, language, and version already exists.'
+        ));
       }
       
-      return reply.status(500).send({
-        success: false,
-        message: 'Internal server error',
-        error: error.message,
-      });
+      return reply.status(500).send(createResponse(
+        false,
+        'Internal server error',
+        undefined,
+        error.message
+      ));
     }
   });
 
@@ -256,10 +261,10 @@ export default async function templateRoutes(fastify, options) {
         });
 
         if (!template) {
-          return reply.status(404).send({
-            success: false,
-            message: `Template '${template_code}' not found for language '${language}'`,
-          });
+          return reply.status(404).send(createResponse(
+            false,
+            `Template '${template_code}' not found for language '${language}'`
+          ));
         }
 
         // Cache the template for 1 hour (3600 seconds)
@@ -269,19 +274,20 @@ export default async function templateRoutes(fastify, options) {
         request.log.info(`Cache hit for template: ${template_code} (${language})`);
       }
 
-      return reply.status(200).send({
-        success: true,
-        message: 'Latest template version retrieved successfully',
-        data: template,
-      });
+      return reply.status(200).send(createResponse(
+        true,
+        'Latest template version retrieved successfully',
+        template
+      ));
       
     } catch (error) {
       request.log.error('Error retrieving latest template:', error);
-      return reply.status(500).send({
-        success: false,
-        message: 'Internal server error',
-        error: error.message,
-      });
+      return reply.status(500).send(createResponse(
+        false,
+        'Internal server error',
+        undefined,
+        error.message
+      ));
     }
   });
 
@@ -357,10 +363,10 @@ export default async function templateRoutes(fastify, options) {
         });
 
         if (!template) {
-          return reply.status(404).send({
-            success: false,
-            message: `Template '${template_code}' version ${version} not found for language '${language}'`,
-          });
+          return reply.status(404).send(createResponse(
+            false,
+            `Template '${template_code}' version ${version} not found for language '${language}'`
+          ));
         }
 
         // Cache the template version for 1 hour (3600 seconds)
@@ -370,19 +376,20 @@ export default async function templateRoutes(fastify, options) {
         request.log.info(`Cache hit for template version: ${template_code} v${version} (${language})`);
       }
 
-      return reply.status(200).send({
-        success: true,
-        message: 'Template version retrieved successfully',
-        data: template,
-      });
+      return reply.status(200).send(createResponse(
+        true,
+        'Template version retrieved successfully',
+        template
+      ));
       
     } catch (error) {
       request.log.error('Error retrieving specific template version:', error);
-      return reply.status(500).send({
-        success: false,
-        message: 'Internal server error',
-        error: error.message,
-      });
+      return reply.status(500).send(createResponse(
+        false,
+        'Internal server error',
+        undefined,
+        error.message
+      ));
     }
   });
 
@@ -435,25 +442,26 @@ export default async function templateRoutes(fastify, options) {
       });
 
       if (templates.length === 0) {
-        return reply.status(404).send({
-          success: false,
-          message: 'No templates found for this code and language',
-        });
+        return reply.status(404).send(createResponse(
+          false,
+          'No templates found for this code and language'
+        ));
       }
 
-      return reply.status(200).send({
-        success: true,
-        message: 'Template versions retrieved successfully',
-        data: templates,
-      });
+      return reply.status(200).send(createResponse(
+        true,
+        'Template versions retrieved successfully',
+        templates
+      ));
       
     } catch (error) {
       fastify.log.error('Error retrieving template versions:', error);
-      return reply.status(500).send({
-        success: false,
-        message: 'Internal server error',
-        error: error.message,
-      });
+      return reply.status(500).send(createResponse(
+        false,
+        'Internal server error',
+        undefined,
+        error.message
+      ));
     }
   });
 
@@ -476,10 +484,10 @@ export default async function templateRoutes(fastify, options) {
 
       // If no existing template found, return 404
       if (!latestTemplate) {
-        return reply.status(404).send({
-          success: false,
-          message: `Template with code '${template_code}' and language '${language}' not found. Create it first using POST /api/v1/templates/`,
-        });
+        return reply.status(404).send(createResponse(
+          false,
+          `Template with code '${template_code}' and language '${language}' not found. Create it first using POST /api/v1/templates/`
+        ));
       }
 
       // 2. Get the current highest version number
@@ -502,28 +510,29 @@ export default async function templateRoutes(fastify, options) {
       await fastify.invalidateTemplateCache(template_code, language);
       request.log.info(`Invalidated cache for template: ${template_code} (${language})`);
 
-      return reply.status(201).send({
-        success: true,
-        message: `Template version ${newVersion} created successfully`,
-        data: newTemplate,
-      });
+      return reply.status(201).send(createResponse(
+        true,
+        `Template version ${newVersion} created successfully`,
+        newTemplate
+      ));
       
     } catch (error) {
       fastify.log.error('Error creating template version:', error);
       
       // Handle Prisma unique constraint violation
       if (error.code === 'P2002') {
-        return reply.status(409).send({
-          success: false,
-          message: 'Template version already exists. This is likely a concurrency issue.',
-        });
+        return reply.status(409).send(createResponse(
+          false,
+          'Template version already exists. This is likely a concurrency issue.'
+        ));
       }
       
-      return reply.status(500).send({
-        success: false,
-        message: 'Internal server error',
-        error: error.message,
-      });
+      return reply.status(500).send(createResponse(
+        false,
+        'Internal server error',
+        undefined,
+        error.message
+      ));
     }
   });
 }
