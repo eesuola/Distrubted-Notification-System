@@ -181,14 +181,17 @@ export default async function templateRoutes(fastify, options) {
     }
   });
 
-  // GET /api/v1/templates/:template_code - Get latest template by code
+  // GET /api/v1/templates/:template_code - Get latest version of a template
   fastify.get('/:template_code', {
     schema: {
       params: {
         type: 'object',
         required: ['template_code'],
         properties: {
-          template_code: { type: 'string' },
+          template_code: { 
+            type: 'string',
+            description: 'Template code identifier'
+          },
         },
       },
       querystring: {
@@ -196,11 +199,8 @@ export default async function templateRoutes(fastify, options) {
         properties: {
           language: { 
             type: 'string',
-            description: 'Language code (default: en)'
-          },
-          version: {
-            type: 'integer',
-            description: 'Specific version number (optional)'
+            description: 'Language code (default: en)',
+            default: 'en'
           },
         },
       },
@@ -213,54 +213,133 @@ export default async function templateRoutes(fastify, options) {
             data: templateResponseSchema,
           },
         },
+        404: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: { type: 'string' },
+          },
+        },
       },
     },
   }, async (request, reply) => {
     const { template_code } = request.params;
-    const { language = 'en', version } = request.query;
+    const { language = 'en' } = request.query;
 
     try {
-      let template;
-
-      if (version) {
-        // Get specific version
-        template = await fastify.prisma.template.findUnique({
-          where: {
-            template_code_language_version: {
-              template_code,
-              language,
-              version: parseInt(version, 10),
-            },
-          },
-        });
-      } else {
-        // Get latest version
-        template = await fastify.prisma.template.findFirst({
-          where: {
-            template_code,
-            language,
-          },
-          orderBy: {
-            version: 'desc',
-          },
-        });
-      }
+      // Query the database for the template with template_code and language
+      // Order the results by version in descending order
+      // Return the single record with the highest version number
+      const template = await fastify.prisma.template.findFirst({
+        where: {
+          template_code,
+          language,
+        },
+        orderBy: {
+          version: 'desc',
+        },
+      });
 
       if (!template) {
         return reply.status(404).send({
           success: false,
-          message: 'Template not found',
+          message: `Template '${template_code}' not found for language '${language}'`,
         });
       }
 
       return reply.status(200).send({
         success: true,
-        message: 'Template retrieved successfully',
+        message: 'Latest template version retrieved successfully',
         data: template,
       });
       
     } catch (error) {
-      fastify.log.error('Error retrieving template:', error);
+      fastify.log.error('Error retrieving latest template:', error);
+      return reply.status(500).send({
+        success: false,
+        message: 'Internal server error',
+        error: error.message,
+      });
+    }
+  });
+
+  // GET /api/v1/templates/:template_code/versions/:version - Get a specific version of a template
+  fastify.get('/:template_code/versions/:version', {
+    schema: {
+      params: {
+        type: 'object',
+        required: ['template_code', 'version'],
+        properties: {
+          template_code: { 
+            type: 'string',
+            description: 'Template code identifier'
+          },
+          version: { 
+            type: 'integer',
+            minimum: 1,
+            description: 'Specific version number'
+          },
+        },
+      },
+      querystring: {
+        type: 'object',
+        properties: {
+          language: { 
+            type: 'string',
+            description: 'Language code (default: en)',
+            default: 'en'
+          },
+        },
+      },
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: { type: 'string' },
+            data: templateResponseSchema,
+          },
+        },
+        404: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            message: { type: 'string' },
+          },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const { template_code, version } = request.params;
+    const { language = 'en' } = request.query;
+
+    try {
+      // Query the database for the exact record matching template_code, language, and version
+      const template = await fastify.prisma.template.findUnique({
+        where: {
+          template_code_language_version: {
+            template_code,
+            language,
+            version: parseInt(version, 10),
+          },
+        },
+      });
+
+      if (!template) {
+        return reply.status(404).send({
+          success: false,
+          message: `Template '${template_code}' version ${version} not found for language '${language}'`,
+        });
+      }
+
+      return reply.status(200).send({
+        success: true,
+        message: 'Template version retrieved successfully',
+        data: template,
+      });
+      
+    } catch (error) {
+      fastify.log.error('Error retrieving specific template version:', error);
       return reply.status(500).send({
         success: false,
         message: 'Internal server error',
