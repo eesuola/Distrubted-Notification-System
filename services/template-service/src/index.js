@@ -9,11 +9,9 @@ dotenv.config();
 
 // Import plugins
 import prismaPlugin from './plugins/prisma.js';
-import authPlugin from './plugins/auth.js';
-import correlationIdPlugin from './plugins/correlation-id.js';
 
 // Import routes
-import userRoutes from './routes/users.js';
+import templateRoutes from './routes/templates.js';
 
 // Create Fastify instance
 const fastify = Fastify({
@@ -38,25 +36,17 @@ await fastify.register(cors, {
 await fastify.register(swagger, {
   swagger: {
     info: {
-      title: 'User Service API',
-      description: 'API documentation for the User Service',
+      title: 'Template Service API',
+      description: 'API documentation for the Template Service - manages notification templates with versioning',
       version: '0.1.0',
     },
-    host: process.env.SWAGGER_HOST || 'localhost:3001',
+    host: process.env.SWAGGER_HOST || 'localhost:3002',
     schemes: ['http', 'https'],
     consumes: ['application/json'],
     produces: ['application/json'],
     tags: [
-      { name: 'users', description: 'User management endpoints' },
+      { name: 'templates', description: 'Template management endpoints' },
     ],
-    securityDefinitions: {
-      Bearer: {
-        type: 'apiKey',
-        name: 'Authorization',
-        in: 'header',
-        description: 'JWT authorization header using the Bearer scheme. Example: "Bearer {token}"',
-      },
-    },
   },
 });
 
@@ -71,37 +61,19 @@ await fastify.register(swaggerUi, {
 });
 
 // Register custom plugins
-await fastify.register(correlationIdPlugin);
 await fastify.register(prismaPlugin);
-await fastify.register(authPlugin);
 
-// Health check endpoint with database connectivity check
+// Health check endpoint
 fastify.get('/health', async (request, reply) => {
-  try {
-    // Check database connectivity by executing a simple query
-    await fastify.prisma.$queryRaw`SELECT 1`;
-    
-    request.log.info('Health check passed');
-    
-    return reply.status(200).send({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      database: 'connected',
-    });
-  } catch (error) {
-    request.log.error({ err: error }, 'Health check failed - database connection error');
-    
-    return reply.status(503).send({
-      status: 'error',
-      timestamp: new Date().toISOString(),
-      database: 'disconnected',
-      error: error.message,
-    });
-  }
+  return {
+    success: true,
+    message: 'Template service is healthy',
+    timestamp: new Date().toISOString(),
+  };
 });
 
 // Register API routes
-await fastify.register(userRoutes, { prefix: '/api/v1/users' });
+await fastify.register(templateRoutes, { prefix: '/api/v1/templates' });
 
 // 404 handler
 fastify.setNotFoundHandler((request, reply) => {
@@ -143,12 +115,12 @@ fastify.setErrorHandler((error, request, reply) => {
 // Start server
 const start = async () => {
   try {
-    const port = parseInt(process.env.PORT || '3001', 10);
+    const port = parseInt(process.env.PORT || '3002', 10);
     const host = process.env.HOST || '0.0.0.0';
 
     await fastify.listen({ port, host });
     
-    fastify.log.info(`User service listening on ${host}:${port}`);
+    fastify.log.info(`Template service listening on ${host}:${port}`);
     fastify.log.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
     fastify.log.info(`API Documentation available at http://${host}:${port}/documentation`);
   } catch (err) {
