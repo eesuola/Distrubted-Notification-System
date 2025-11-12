@@ -1,11 +1,12 @@
 import consul from 'consul';
+import { consul_config, service_config, service_names } from '../config.js';
 
 // Consul plugin for service discovery
 async function consulPlugin(fastify, options) {
   // Initialize Consul client
   const consulClient = consul({
-    host: process.env.CONSUL_HOST || 'localhost',
-    port: process.env.CONSUL_PORT || '8500',
+    host: consul_config.host,
+    port: consul_config.port,
     promisify: true,
   });
 
@@ -72,12 +73,12 @@ async function consulPlugin(fastify, options) {
         const defaultConfig = {
           id: `${serviceConfig.name}-${process.env.HOSTNAME || 'local'}-${serviceConfig.port}`,
           name: serviceConfig.name,
-          address: process.env.HOST || 'localhost',
+          address: service_config.host,
           port: serviceConfig.port,
           check: {
-            http: `http://${process.env.HOST || 'localhost'}:${serviceConfig.port}/health`,
-            interval: '10s',
-            timeout: '5s',
+            http: `http://${service_config.host}:${serviceConfig.port}/health`,
+            interval: consul_config.health_check_interval,
+            timeout: consul_config.health_check_timeout,
           },
         };
 
@@ -140,16 +141,13 @@ async function consulPlugin(fastify, options) {
 
   // Register API Gateway service with Consul on startup
   fastify.addHook('onReady', async () => {
-    const port = process.env.PORT || 3000;
-    const serviceName = 'api-gateway';
-    
     try {
       await serviceDiscovery.registerService({
-        name: serviceName,
-        port: parseInt(port),
+        name: service_names.api_gateway,
+        port: service_config.port,
         meta: {
           protocol: 'http',
-          version: '1.0.0',
+          version: service_config.version,
           description: 'API Gateway for distributed notification system',
         },
       });
@@ -160,8 +158,7 @@ async function consulPlugin(fastify, options) {
 
   // Deregister service on shutdown
   fastify.addHook('onClose', async () => {
-    const port = process.env.PORT || 3000;
-    const serviceId = `api-gateway-${process.env.HOSTNAME || 'local'}-${port}`;
+    const serviceId = `${service_names.api_gateway}-${process.env.HOSTNAME || 'local'}-${service_config.port}`;
     
     try {
       await serviceDiscovery.deregisterService(serviceId);

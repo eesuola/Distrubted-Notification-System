@@ -2,13 +2,16 @@
   "name": "@services/api-gateway",
   "version": "1.0.0",
   "description": "API Gateway service for distributed notification system",
-  "main": "src/index.js",
+  "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "nodemon --exec ts-node src/index.ts",
     "test:rabbitmq": "node test-rabbitmq.js",
-    "test:complete": "node test-complete-flow.js"
+    "test:complete": "node test-complete-flow.js",
+    "test:notifications": "node test-notifications.js",
+    "test:basic": "node test-basic.js"
   },
   "dependencies": {
     "fastify": "^4.24.3",
@@ -17,14 +20,23 @@
     "@fastify/jwt": "^7.2.4",
     "@fastify/redis": "^6.1.1",
     "@fastify/ajv-errors": "^3.0.1",
+    "@fastify/cors": "^8.4.0",
     "consul": "^0.40.0",
-    "amqplib": "^0.10.3"
+    "amqplib": "^0.10.3",
+    "ioredis": "^5.3.2",
+    "jsonwebtoken": "^9.0.2",
+    "opossum": "^8.1.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.2",
     "nock": "^13.3.3",
     "ioredis-mock": "^8.9.0",
-    "jsonwebtoken": "^9.0.2"
+    "typescript": "^5.2.2",
+    "ts-node": "^10.9.1",
+    "@types/node": "^20.8.0",
+    "@types/amqplib": "^0.10.4",
+    "@types/consul": "^0.40.2",
+    "@types/jsonwebtoken": "^9.0.4"
   },
   "keywords": [
     "api-gateway",
