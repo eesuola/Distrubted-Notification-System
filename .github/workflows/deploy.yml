@@ -139,7 +139,7 @@ jobs:
               <ul>
                 <li><strong>Commit:</strong> ${context.sha}</li>
                 <li><strong>Branch:</strong> ${context.ref.replace('refs/heads/', '')}</li>
-                <li><strong>Services:</strong> ${needs.discover-services.outputs.services}</li>
+                <li><strong>Services:</strong> '${{ needs.discover-services.outputs.services }}'</li>
                 <li><strong>Registry:</strong> ${process.env.REGISTRY}</li>
                 <li><strong>Image Tag:</strong> ${process.env.IMAGE_TAG}</li>
               </ul>
@@ -175,7 +175,7 @@ jobs:
               <ul>
                 <li><strong>Commit:</strong> ${context.sha}</li>
                 <li><strong>Branch:</strong> ${context.ref.replace('refs/heads/', '')}</li>
-                <li><strong>Services:</strong> ${needs.discover-services.outputs.services}</li>
+                <li><strong>Services:</strong> '${{ needs.discover-services.outputs.services }}'</li>
                 <li><strong>Registry:</strong> ${process.env.REGISTRY}</li>
                 <li><strong>Image Tag:</strong> ${process.env.IMAGE_TAG}</li>
                 <li><strong>Status:</strong> All health checks passed</li>
@@ -195,7 +195,7 @@ jobs:
               <ul>
                 <li><strong>Commit:</strong> ${context.sha}</li>
                 <li><strong>Branch:</strong> ${context.ref.replace('refs/heads/', '')}</li>
-                <li><strong>Services:</strong> ${needs.discover-services.outputs.services}</li>
+                <li><strong>Services:</strong> '${{ needs.discover-services.outputs.services }}'</li>
                 <li><strong>Registry:</strong> ${process.env.REGISTRY}</li>
                 <li><strong>Image Tag:</strong> ${process.env.IMAGE_TAG}</li>
                 <li><strong>Status:</strong> Health checks failed</li>
@@ -215,7 +215,7 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          const failedStage = needs.deploy.result || needs.build-and-push.result || needs.test.result || needs.security-scan.result;
+          const failedStage = '${{ needs.deploy.result }}' || '${{ needs.build-and-push.result }}' || '${{ needs.test.result }}' || '${{ needs.security-scan.result }}';
           
           core.summary
             .addRaw('❌ **Pipeline Failed**\n\n')
