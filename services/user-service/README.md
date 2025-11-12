@@ -8,6 +8,7 @@ Microservice for user management and authentication in the Distributed Notificat
 - **Database**: PostgreSQL
 - **ORM**: Prisma
 - **Authentication**: JWT with bcrypt password hashing
+- **Service Discovery**: Consul service registration
 - **Documentation**: Swagger/OpenAPI
 
 ## Features
@@ -20,6 +21,7 @@ Microservice for user management and authentication in the Distributed Notificat
 - **Health check with database connectivity monitoring**
 - **Distributed tracing with correlation IDs**
 - **Structured logging with Pino**
+- **Service registration with Consul**
 
 ## API Endpoints
 
@@ -263,6 +265,67 @@ Microservice for user management and authentication in the Distributed Notificat
 6. **View API documentation**:
    - Open browser at `http://localhost:3001/documentation`
 
+## Docker Deployment
+
+### Using Docker Compose (Recommended)
+
+The easiest way to run the User Service with all dependencies (PostgreSQL and Consul) is using Docker Compose:
+
+1. **Start all services**:
+   ```bash
+   docker-compose up -d
+   ```
+
+2. **View logs**:
+   ```bash
+   docker-compose logs -f user-service
+   ```
+
+3. **Stop services**:
+   ```bash
+   docker-compose down
+   ```
+
+4. **Access services**:
+   - User Service API: http://localhost:3001
+   - API Documentation: http://localhost:3001/documentation
+   - Consul UI: http://localhost:8500
+   - PostgreSQL: localhost:5432
+
+### Using Docker Standalone
+
+If you already have PostgreSQL and Consul running, you can build and run just the User Service:
+
+1. **Build the Docker image**:
+   ```bash
+   docker build -t user-service .
+   ```
+
+2. **Run the container**:
+   ```bash
+   docker run -d \
+     --name user-service \
+     -p 3001:3001 \
+     -e PORT=3001 \
+     -e HOST=0.0.0.0 \
+     -e DATABASE_URL="postgresql://user:password@host.docker.internal:5432/user_service?schema=public" \
+     -e JWT_SECRET=your-super-secret-jwt-key-change-this-in-production \
+     -e JWT_EXPIRES_IN=7d \
+     -e CONSUL_HOST=host.docker.internal \
+     -e CONSUL_PORT=8500 \
+     user-service
+   ```
+
+### Docker Health Checks
+
+The Dockerfile includes a health check that monitors the `/health` endpoint:
+- Checks every 30 seconds
+- Times out after 3 seconds
+- Starts after 5 seconds of container startup
+- Retries 3 times before marking as unhealthy
+
+This integrates with Docker's health monitoring and can be used by orchestration systems like Kubernetes for liveness and readiness probes.
+
 ## Database Schema
 
 ### User Table
@@ -366,7 +429,8 @@ The service uses **Pino** for structured JSON logging:
 - **Fastify Plugins**: Modular plugin architecture
   - `prisma.js`: Database connection and Prisma client management
   - `auth.js`: JWT authentication and token generation
-  - `correlation-id.js`: **NEW** - Distributed tracing with correlation IDs
+  - `correlation-id.js`: Distributed tracing with correlation IDs
+  - `consul.js`: **NEW** - Service registration with Consul
 - **JSON Schema Validation**: Type-safe request/response validation
 - **Prisma ORM**: Type-safe database access with PostgreSQL
 - **Swagger Documentation**: Auto-generated API documentation
@@ -406,6 +470,8 @@ All responses follow a consistent format:
 | `JWT_EXPIRES_IN` | JWT expiration time | `7d` |
 | `CORS_ORIGIN` | CORS allowed origins | `*` |
 | `LOG_LEVEL` | Logging level | `info` |
+| `CONSUL_HOST` | Consul server host | `localhost` |
+| `CONSUL_PORT` | Consul server port | `8500` |
 
 ## Monitoring & Operations
 
@@ -429,3 +495,52 @@ The **GET /api/v1/users/:user_id/** endpoint is designed to be called by the API
 1. **Always pass `x-correlation-id`**: When the API Gateway makes requests to this service, it should pass the correlation ID in the header
 2. **No synchronous calls**: This service does not make synchronous HTTP calls to other services - it only interacts with its own PostgreSQL database
 3. **Async-ready**: All operations are asynchronous and non-blocking
+4. **Service Discovery**: The service automatically registers with Consul on startup and deregisters on shutdown
+
+## Consul Service Registration
+
+The User Service automatically registers with Consul for service discovery:
+
+### Registration Details
+- **Service Name**: `user-service`
+- **Service ID**: `user-service-{hostname}-{uuid}` (unique per instance)
+- **Health Check**: HTTP GET to `/health` endpoint
+- **Health Check Interval**: Every 10 seconds
+- **Health Check Timeout**: 5 seconds
+- **Deregistration**: Automatically deregisters after 30 seconds of critical health status
+
+### Configuration
+Configure Consul connection using environment variables:
+```env
+CONSUL_HOST=localhost
+CONSUL_PORT=8500
+```
+
+### Service Discovery Usage
+Other services can discover the User Service through Consul's API or DNS interface:
+```bash
+# Query all user-service instances
+dig user-service.service.consul
+
+# Query via HTTP API
+curl http://localhost:8500/v1/catalog/service/user-service
+```
+
+## Testing Consul Integration
+
+To verify that the Consul integration works correctly before deploying the service, use the provided test script:
+
+### Quick Test
+```bash
+npm run test:consul
+```
+
+### Detailed Instructions
+For comprehensive testing instructions, prerequisites, and troubleshooting, see [CONSUL_TEST.md](./CONSUL_TEST.md).
+
+The test script verifies:
+- Consul connection
+- Service registration with Consul
+- Service discovery (querying Consul for the registered service)
+- Service deregistration
+- Consul plugin functionality with Fastify

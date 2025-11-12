@@ -9,6 +9,7 @@
     "dev": "node --watch src/index.js",
     "build": "prisma generate",
     "test": "echo 'No tests specified for user-service' && exit 0",
+    "test:consul": "node test-consul.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio"
@@ -24,7 +25,8 @@
     "bcrypt": "^5.1.1",
     "jsonwebtoken": "^9.0.2",
     "dotenv": "^16.3.1",
-    "pino": "^8.17.0"
+    "pino": "^8.17.0",
+    "consul": "^0.40.0"
   },
   "devDependencies": {
     "prisma": "^5.7.0",
