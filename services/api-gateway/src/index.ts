@@ -1,26 +1,37 @@
 import fastify from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import consulPlugin from './plugins/consul.js';
 import correlationIdPlugin from './plugins/correlation-id.js';
 import rabbitmqPlugin from './plugins/rabbitmq.js';
 import redisPlugin from './plugins/redis.js';
 import authPlugin from './plugins/auth.js';
 import notificationRoutes from './routes/notifications.js';
-import { createResponse } from '../../../shared/response.js';
+import { createResponse } from '@shared/response.js';
 import { service_config, logging_config } from './config.js';
 
+// Declare process for global access
+declare const process: {
+  uptime(): number;
+  env: Record<string, string | undefined>;
+  exit(code?: number): never;
+  on(event: string, listener: (...args: any[]) => void): void;
+};
+
 // Create Fastify instance
-const server = fastify({
+const server: FastifyInstance = fastify({
   logger: {
     level: logging_config.level,
-    prettyPrint: logging_config.pretty_print,
+    ...(logging_config.pretty_print && {
+      transport: {
+        target: 'pino-pretty'
+      }
+    }),
     timestamp: logging_config.include_timestamp,
-    hostname: logging_config.include_hostname,
-    pid: logging_config.include_pid,
   },
 });
 
 // Register plugins in the correct order
-async function registerPlugins() {
+async function registerPlugins(): Promise<void> {
   try {
     // Register core infrastructure plugins first
     await server.register(correlationIdPlugin);
@@ -38,17 +49,13 @@ async function registerPlugins() {
     await server.register(rabbitmqPlugin);
     server.log.info('RabbitMQ plugin registered');
     
-    // Register authentication plugin
-    await server.register(authPlugin);
-    server.log.info('Authentication plugin registered');
-    
     // Register notification routes after all plugins are loaded
     await server.register(notificationRoutes, { prefix: '/api/v1' });
     server.log.info('Notification routes registered');
     
     server.log.info('All plugins registered successfully');
   } catch (error) {
-    server.log.error('Failed to register plugins:', error);
+    server.log.error({ error }, 'Failed to register plugins');
     throw error;
   }
 }
@@ -58,15 +65,15 @@ server.get('/health', async (request, reply) => {
   const health = {
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    service: 'api-gateway',
+    service: service_config.name,
     uptime: process.uptime(),
-    services: {},
+    services: {} as Record<string, any>,
   };
 
   // Check RabbitMQ connection if plugin is loaded
-  if (server.checkRabbitMQConnection) {
+  if ((server as any).checkRabbitMQConnection) {
     try {
-      const rabbitmqStatus = await server.checkRabbitMQConnection();
+      const rabbitmqStatus = await (server as any).checkRabbitMQConnection();
       health.services.rabbitmq = {
         status: rabbitmqStatus ? 'connected' : 'disconnected',
         connected: rabbitmqStatus,
@@ -79,7 +86,7 @@ server.get('/health', async (request, reply) => {
     } catch (error) {
       health.services.rabbitmq = {
         status: 'error',
-        error: error.message,
+        error: (error as Error).message,
         connected: false,
       };
       health.status = 'degraded';
@@ -87,9 +94,9 @@ server.get('/health', async (request, reply) => {
   }
 
   // Check Redis connection if plugin is loaded
-  if (server.checkRedisConnection) {
+  if ((server as any).checkRedisConnection) {
     try {
-      const redisStatus = await server.checkRedisConnection();
+      const redisStatus = await (server as any).checkRedisConnection();
       health.services.redis = {
         status: redisStatus ? 'connected' : 'disconnected',
         connected: redisStatus,
@@ -102,7 +109,7 @@ server.get('/health', async (request, reply) => {
     } catch (error) {
       health.services.redis = {
         status: 'error',
-        error: error.message,
+        error: (error as Error).message,
         connected: false,
       };
       health.status = 'degraded';
@@ -124,13 +131,13 @@ server.setErrorHandler((error, request, reply) => {
 });
 
 // Initialize connections before starting server
-async function initializeConnections() {
+async function initializeConnections(): Promise<void> {
   try {
     server.log.info('Initializing connections...');
     
     // Check Redis connection
-    if (server.checkRedisConnection) {
-      const redisStatus = await server.checkRedisConnection();
+    if ((server as any).checkRedisConnection) {
+      const redisStatus = await (server as any).checkRedisConnection();
       if (!redisStatus) {
         server.log.warn('Redis connection not available, service will run in degraded mode');
       } else {
@@ -139,8 +146,8 @@ async function initializeConnections() {
     }
     
     // Check RabbitMQ connection
-    if (server.checkRabbitMQConnection) {
-      const rabbitmqStatus = await server.checkRabbitMQConnection();
+    if ((server as any).checkRabbitMQConnection) {
+      const rabbitmqStatus = await (server as any).checkRabbitMQConnection();
       if (!rabbitmqStatus) {
         server.log.warn('RabbitMQ connection not available, service will run in degraded mode');
       } else {
@@ -149,24 +156,24 @@ async function initializeConnections() {
     }
     
     // Check Consul connection
-    if (server.consul) {
+    if ((server as any).consul) {
       try {
-        const leader = await server.consul.status.leader();
+        const leader = await (server as any).consul.status.leader();
         server.log.info(`Consul connection verified, leader: ${leader}`);
       } catch (error) {
-        server.log.warn('Consul connection not available, service discovery may be limited:', error.message);
+        server.log.warn({ error }, 'Consul connection not available, service discovery may be limited');
       }
     }
     
     server.log.info('Connection initialization completed');
   } catch (error) {
-    server.log.error('Error during connection initialization:', error);
+    server.log.error({ error }, 'Error during connection initialization');
     // Don't throw error, allow service to start in degraded mode
   }
 }
 
 // Start server
-async function start() {
+async function start(): Promise<void> {
   try {
     // Register plugins
     await registerPlugins();
@@ -184,44 +191,44 @@ async function start() {
     server.log.info(`Environment: ${service_config.environment}`);
     server.log.info('Server is ready to accept requests');
   } catch (err) {
-    server.log.error('Failed to start server:', err);
+    server.log.error({ error: err }, 'Failed to start server');
     process.exit(1);
   }
 }
 
 // Handle graceful shutdown
-async function gracefulShutdown(signal) {
+async function gracefulShutdown(signal: string): Promise<void> {
   server.log.info(`Received ${signal}, shutting down gracefully...`);
   
   try {
     // Close RabbitMQ connection if available
-    if (server.closeRabbitMQConnection) {
+    if ((server as any).closeRabbitMQConnection) {
       try {
-        await server.closeRabbitMQConnection();
+        await (server as any).closeRabbitMQConnection();
         server.log.info('RabbitMQ connection closed');
       } catch (error) {
-        server.log.error('Error closing RabbitMQ connection during shutdown:', error);
+        server.log.error({ error }, 'Error closing RabbitMQ connection during shutdown');
       }
     }
     
     // Close Redis connection if available
-    if (server.redis && server.redis.quit) {
+    if ((server as any).redis && (server as any).redis.quit) {
       try {
-        await server.redis.quit();
+        await (server as any).redis.quit();
         server.log.info('Redis connection closed');
       } catch (error) {
-        server.log.error('Error closing Redis connection during shutdown:', error);
+        server.log.error({ error }, 'Error closing Redis connection during shutdown');
       }
     }
     
     // Deregister from Consul if available
-    if (server.serviceDiscovery && server.serviceDiscovery.deregisterService) {
+    if ((server as any).serviceDiscovery && (server as any).serviceDiscovery.deregisterService) {
       try {
         const serviceId = `${service_config.name}-${process.env.HOSTNAME || 'local'}-${service_config.port}`;
-        await server.serviceDiscovery.deregisterService(serviceId);
+        await (server as any).serviceDiscovery.deregisterService(serviceId);
         server.log.info('Service deregistered from Consul');
       } catch (error) {
-        server.log.error('Error deregistering from Consul during shutdown:', error);
+        server.log.error({ error }, 'Error deregistering from Consul during shutdown');
       }
     }
     
@@ -231,7 +238,7 @@ async function gracefulShutdown(signal) {
     
     process.exit(0);
   } catch (error) {
-    server.log.error('Error during graceful shutdown:', error);
+    server.log.error({ error }, 'Error during graceful shutdown');
     process.exit(1);
   }
 }
@@ -241,14 +248,14 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-  server.log.error('Uncaught Exception:', error);
+process.on('uncaughtException', (error: Error) => {
+  server.log.error({ error }, 'Uncaught Exception');
   gracefulShutdown('uncaughtException');
 });
 
 // Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  server.log.error('Unhandled Rejection at:', promise, 'reason:', reason);
+process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+  server.log.error({ promise, reason }, 'Unhandled Rejection');
   gracefulShutdown('unhandledRejection');
 });
 

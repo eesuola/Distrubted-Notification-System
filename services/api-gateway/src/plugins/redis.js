@@ -1,4 +1,5 @@
 import fp from 'fastify-plugin';
+import { redis_config } from '../config.js';
 
 /**
  * Fastify plugin to connect to Redis for API Gateway
@@ -9,19 +10,19 @@ async function redisPlugin(fastify, options) {
   try {
     // Register Redis connection
     await fastify.register(import('@fastify/redis'), {
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379', 10),
-      password: process.env.REDIS_PASSWORD || undefined,
-      db: parseInt(process.env.REDIS_DB || '0', 10),
-      retryDelayOnFailover: 100,
-      maxRetriesPerRequest: 3,
-      lazyConnect: true,
-      connectTimeout: 10000,
-      commandTimeout: 5000,
+      host: redis_config.host,
+      port: redis_config.port,
+      password: redis_config.password,
+      db: redis_config.db,
+      retryDelayOnFailover: redis_config.retry_delay_on_failover,
+      maxRetriesPerRequest: redis_config.max_retries_per_request,
+      lazyConnect: redis_config.lazy_connect,
+      connectTimeout: redis_config.connect_timeout,
+      commandTimeout: redis_config.command_timeout,
     });
 
-    // Default TTL for cached responses (24 hours in seconds)
-    const DEFAULT_TTL = 24 * 60 * 60;
+    // Default TTL for cached responses
+    const DEFAULT_TTL = redis_config.default_ttl;
 
     // Add a method to generate idempotency keys
     fastify.decorate('getIdempotencyKey', (requestId) => {
@@ -116,7 +117,7 @@ async function redisPlugin(fastify, options) {
     });
 
     // Decorator to store notification status
-    fastify.decorate('storeNotificationStatus', async (notificationId, statusData, ttl = 7 * 24 * 60 * 60) => {
+    fastify.decorate('storeNotificationStatus', async (notificationId, statusData, ttl = redis_config.notification_status_ttl) => {
       try {
         const key = fastify.getNotificationStatusKey(notificationId);
         await fastify.redis.setex(key, ttl, JSON.stringify(statusData));

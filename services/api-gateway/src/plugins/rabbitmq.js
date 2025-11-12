@@ -1,5 +1,6 @@
 import fp from 'fastify-plugin';
 import amqp from 'amqplib';
+import { rabbitmq_config } from '../config.js';
 
 /**
  * Fastify plugin to connect to RabbitMQ for API Gateway
@@ -10,16 +11,16 @@ async function rabbitmqPlugin(fastify, options) {
   let connection = null;
   let channel = null;
 
-  // RabbitMQ configuration from environment variables
+  // Use centralized configuration
   const config = {
-    url: process.env.RABBITMQ_URL || 'amqp://localhost:5672',
-    exchange: process.env.RABBITMQ_EXCHANGE || 'notifications.direct',
-    exchangeType: process.env.RABBITMQ_EXCHANGE_TYPE || 'direct',
-    emailQueue: process.env.RABBITMQ_EMAIL_QUEUE || 'email.queue',
-    pushQueue: process.env.RABBITMQ_PUSH_QUEUE || 'push.queue',
-    failedQueue: process.env.RABBITMQ_FAILED_QUEUE || 'failed.queue',
-    reconnectDelay: parseInt(process.env.RABBITMQ_RECONNECT_DELAY || '5000', 10),
-    maxReconnectAttempts: parseInt(process.env.RABBITMQ_MAX_RECONNECT_ATTEMPTS || '10', 10),
+    url: rabbitmq_config.url,
+    exchange: rabbitmq_config.exchange,
+    exchangeType: rabbitmq_config.exchange_type,
+    emailQueue: rabbitmq_config.email_queue,
+    pushQueue: rabbitmq_config.push_queue,
+    failedQueue: rabbitmq_config.failed_queue,
+    reconnectDelay: rabbitmq_config.reconnect_delay,
+    maxReconnectAttempts: rabbitmq_config.max_reconnect_attempts,
   };
 
   // Connect to RabbitMQ
