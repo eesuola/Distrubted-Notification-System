@@ -12,4 +12,4 @@ const createResponse = (
   return response;
 };
 
-module.exports = { createResponse };
+export default { createResponse };

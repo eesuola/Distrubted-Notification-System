@@ -1,6 +1,5 @@
 import { hashPassword, comparePassword } from '../utils/password.js';
-import responseUtils from '../../../../shared/response.js';
-const { createResponse } = responseUtils;
+import { createResponse } from '../../shared/response.js';
 
 // JSON Schemas for request/response validation
 const userResponseSchema = {

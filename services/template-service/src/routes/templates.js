@@ -1,6 +1,5 @@
 // Import shared response utility
-import responseUtils from '../../../../shared/response.js';
-const { createResponse } = responseUtils;
+import { createResponse } from '../../shared/response.js';
 
 // JSON Schemas for request/response validation
 const templateResponseSchema = {

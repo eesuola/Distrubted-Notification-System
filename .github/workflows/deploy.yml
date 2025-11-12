@@ -24,8 +24,8 @@ jobs:
     - name: Discover services
       id: services
       run: |
-        # Find all directories in services/ that have a Dockerfile
-        SERVICES=$(find services -maxdepth 1 -type d -not -path "services" | xargs -I {} bash -c 'if [ -f "{}/Dockerfile" ]; then echo "$(basename {})"; fi' | tr '\n' ' ')
+        # Find all directories in notification-service/services/ that have a Dockerfile
+        SERVICES=$(find notification-service/services -maxdepth 1 -type d -not -path "notification-service/services" | xargs -I {} bash -c 'if [ -f "{}/Dockerfile" ]; then echo "$(basename {})"; fi' | tr '\n' ' ')
         SERVICE_LIST=$(echo "$SERVICES" | sed 's/ /", "/g' | sed 's/^"/["/' | sed 's/"$/"]/')
         echo "services=$SERVICES" >> $GITHUB_OUTPUT
         echo "service-list=$SERVICE_LIST" >> $GITHUB_OUTPUT
@@ -69,7 +69,7 @@ jobs:
       uses: aquasecurity/trivy-action@master
       with:
         scan-type: 'fs'
-        scan-ref: './services/${{ matrix.service }}'
+        scan-ref: './notification-service/services/${{ matrix.service }}'
         format: 'sarif'
         output: 'trivy-results.sarif'
         
@@ -114,7 +114,7 @@ jobs:
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
-        context: ./services/${{ matrix.service }}
+        context: ./notification-service/services/${{ matrix.service }}
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
@@ -231,5 +231,4 @@ jobs:
               </ul>
               <p><strong>Please check the logs for more details.</strong></p>
             `)
-            .write()
-            
+            .write()            
