@@ -38,3 +38,5 @@ coverage/
 !**/prisma/migrations/**/migration.sql
 .kilocode
 .kilocoderules.md
+TEST_COMPLETE_FLOW.md
+RABBITMQ_PLUGIN.md
