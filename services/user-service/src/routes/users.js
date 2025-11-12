@@ -1,4 +1,6 @@
 import { hashPassword, comparePassword } from '../utils/password.js';
+import responseUtils from '../../../../shared/response.js';
+const { createResponse } = responseUtils;
 
 // JSON Schemas for request/response validation
 const userResponseSchema = {
@@ -184,10 +186,7 @@ export default async function userRoutes(fastify, options) {
 
       if (existingUser) {
         request.log.warn({ email }, 'User creation failed - email already exists');
-        return reply.status(409).send({
-          success: false,
-          message: 'User with this email already exists',
-        });
+        return reply.status(409).send(createResponse(false, 'User with this email already exists'));
       }
 
       // Hash password using bcrypt
@@ -220,21 +219,13 @@ export default async function userRoutes(fastify, options) {
 
       request.log.info({ user_id: user.id, email: user.email }, 'User created successfully');
 
-      return reply.status(201).send({
-        success: true,
-        message: 'User created successfully',
-        data: {
-          user: userWithoutPassword,
-          token,
-        },
-      });
+      return reply.status(201).send(createResponse(true, 'User created successfully', {
+        user: userWithoutPassword,
+        token,
+      }));
     } catch (error) {
       request.log.error({ err: error, email }, 'Error creating user');
-      return reply.status(500).send({
-        success: false,
-        message: 'Internal server error',
-        error: error.message,
-      });
+      return reply.status(500).send(createResponse(false, 'Internal server error', undefined, error.message));
     }
   });
 
@@ -255,10 +246,7 @@ export default async function userRoutes(fastify, options) {
 
       if (!user) {
         request.log.warn({ email }, 'Login failed - user not found');
-        return reply.status(401).send({
-          success: false,
-          message: 'Invalid email or password',
-        });
+        return reply.status(401).send(createResponse(false, 'Invalid email or password'));
       }
 
       // Verify password using bcrypt
@@ -266,10 +254,7 @@ export default async function userRoutes(fastify, options) {
 
       if (!isPasswordValid) {
         request.log.warn({ email, user_id: user.id }, 'Login failed - invalid password');
-        return reply.status(401).send({
-          success: false,
-          message: 'Invalid email or password',
-        });
+        return reply.status(401).send(createResponse(false, 'Invalid email or password'));
       }
 
       // Generate JWT token
@@ -280,21 +265,13 @@ export default async function userRoutes(fastify, options) {
 
       request.log.info({ user_id: user.id, email: user.email }, 'User logged in successfully');
 
-      return reply.status(200).send({
-        success: true,
-        message: 'Login successful',
-        data: {
-          user: userWithoutPassword,
-          token,
-        },
-      });
+      return reply.status(200).send(createResponse(true, 'Login successful', {
+        user: userWithoutPassword,
+        token,
+      }));
     } catch (error) {
       request.log.error({ err: error, email }, 'Error during login');
-      return reply.status(500).send({
-        success: false,
-        message: 'Internal server error',
-        error: error.message,
-      });
+      return reply.status(500).send(createResponse(false, 'Internal server error', undefined, error.message));
     }
   });
 
@@ -314,10 +291,7 @@ export default async function userRoutes(fastify, options) {
 
       if (!user) {
         request.log.warn({ user_id }, 'User profile retrieval failed - user not found');
-        return reply.status(404).send({
-          success: false,
-          message: 'User not found',
-        });
+        return reply.status(404).send(createResponse(false, 'User not found'));
       }
 
       // Remove password from response
@@ -325,18 +299,10 @@ export default async function userRoutes(fastify, options) {
 
       request.log.info({ user_id }, 'User profile retrieved successfully');
 
-      return reply.status(200).send({
-        success: true,
-        message: 'User profile retrieved successfully',
-        data: userWithoutPassword,
-      });
+      return reply.status(200).send(createResponse(true, 'User profile retrieved successfully', userWithoutPassword));
     } catch (error) {
       request.log.error({ err: error, user_id }, 'Error retrieving user profile');
-      return reply.status(500).send({
-        success: false,
-        message: 'Internal server error',
-        error: error.message,
-      });
+      return reply.status(500).send(createResponse(false, 'Internal server error', undefined, error.message));
     }
   });
 
@@ -357,18 +323,12 @@ export default async function userRoutes(fastify, options) {
         // Verify the authenticated user matches the user_id
         if (request.user.user_id !== user_id) {
           request.log.warn({ user_id, authenticated_user_id: request.user.user_id }, 'User update failed - unauthorized');
-          return reply.status(403).send({
-            success: false,
-            message: 'You can only update your own profile',
-          });
+          return reply.status(403).send(createResponse(false, 'You can only update your own profile'));
         }
 
         // Check if there are any fields to update
         if (Object.keys(updates).length === 0) {
-          return reply.status(400).send({
-            success: false,
-            message: 'No valid fields to update',
-          });
+          return reply.status(400).send(createResponse(false, 'No valid fields to update'));
         }
 
         // Update user
@@ -385,26 +345,15 @@ export default async function userRoutes(fastify, options) {
 
         request.log.info({ user_id }, 'User profile updated successfully');
 
-        return reply.status(200).send({
-          success: true,
-          message: 'User updated successfully',
-          data: userWithoutPassword,
-        });
+        return reply.status(200).send(createResponse(true, 'User updated successfully', userWithoutPassword));
       } catch (error) {
         if (error.code === 'P2025') {
           request.log.warn({ user_id }, 'User update failed - user not found');
-          return reply.status(404).send({
-            success: false,
-            message: 'User not found',
-          });
+          return reply.status(404).send(createResponse(false, 'User not found'));
         }
 
         request.log.error({ err: error, user_id }, 'Error updating user');
-        return reply.status(500).send({
-          success: false,
-          message: 'Internal server error',
-          error: error.message,
-        });
+        return reply.status(500).send(createResponse(false, 'Internal server error', undefined, error.message));
       }
     }
   );
@@ -426,18 +375,12 @@ export default async function userRoutes(fastify, options) {
         // Verify the authenticated user matches the user_id
         if (request.user.user_id !== user_id) {
           request.log.warn({ user_id, authenticated_user_id: request.user.user_id }, 'Preferences update failed - unauthorized');
-          return reply.status(403).send({
-            success: false,
-            message: 'You can only update your own preferences',
-          });
+          return reply.status(403).send(createResponse(false, 'You can only update your own preferences'));
         }
 
         // Check if there are any preferences to update
         if (Object.keys(preferences).length === 0) {
-          return reply.status(400).send({
-            success: false,
-            message: 'No preferences provided to update',
-          });
+          return reply.status(400).send(createResponse(false, 'No preferences provided to update'));
         }
 
         // Update or create notification preferences
@@ -461,26 +404,18 @@ export default async function userRoutes(fastify, options) {
 
         request.log.info({ user_id }, 'Notification preferences updated successfully');
 
-        return reply.status(200).send({
-          success: true,
-          message: 'Notification preferences updated successfully',
-          data: {
-            id: user.id,
-            notification_preferences: {
-              email: updatedPreferences.email,
-              push: updatedPreferences.push,
-              sms: updatedPreferences.sms,
-            },
-            updated_at: user.updated_at,
+        return reply.status(200).send(createResponse(true, 'Notification preferences updated successfully', {
+          id: user.id,
+          notification_preferences: {
+            email: updatedPreferences.email,
+            push: updatedPreferences.push,
+            sms: updatedPreferences.sms,
           },
-        });
+          updated_at: user.updated_at,
+        }));
       } catch (error) {
         request.log.error({ err: error, user_id }, 'Error updating notification preferences');
-        return reply.status(500).send({
-          success: false,
-          message: 'Internal server error',
-          error: error.message,
-        });
+        return reply.status(500).send(createResponse(false, 'Internal server error', undefined, error.message));
       }
     }
   );

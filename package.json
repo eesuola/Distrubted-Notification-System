@@ -8,7 +8,8 @@
   "scripts": {
     "build": "npm -ws run build",
     "start": "npm -ws run start",
-    "lint": "npm -ws run lint"
+    "lint": "npm -ws run lint",
+    "test": "npm -ws run test"
   }
 }
 
