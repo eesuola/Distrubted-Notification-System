@@ -14,3 +14,4 @@ coverage/
 *.swo
 .env.local
 .env.*.local
+CONSUL_TEST.md

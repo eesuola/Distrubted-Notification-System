@@ -11,6 +11,7 @@ dotenv.config();
 import prismaPlugin from './plugins/prisma.js';
 import authPlugin from './plugins/auth.js';
 import correlationIdPlugin from './plugins/correlation-id.js';
+import consulPlugin from './plugins/consul.js';
 
 // Import routes
 import userRoutes from './routes/users.js';
@@ -74,6 +75,7 @@ await fastify.register(swaggerUi, {
 await fastify.register(correlationIdPlugin);
 await fastify.register(prismaPlugin);
 await fastify.register(authPlugin);
+await fastify.register(consulPlugin);
 
 // Health check endpoint with database connectivity check
 fastify.get('/health', async (request, reply) => {
