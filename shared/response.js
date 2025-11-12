@@ -12,4 +12,4 @@ const createResponse = (
   return response;
 };
 
-export default { createResponse };
+export { createResponse };

@@ -1,0 +1,36 @@
+{
+  "name": "@services/api-gateway",
+  "version": "1.0.0",
+  "description": "API Gateway service for distributed notification system",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test:rabbitmq": "node test-rabbitmq.js",
+    "test:complete": "node test-complete-flow.js"
+  },
+  "dependencies": {
+    "fastify": "^4.24.3",
+    "@fastify/swagger": "^8.12.0",
+    "@fastify/swagger-ui": "^2.0.0",
+    "@fastify/jwt": "^7.2.4",
+    "@fastify/redis": "^6.1.1",
+    "@fastify/ajv-errors": "^3.0.1",
+    "consul": "^0.40.0",
+    "amqplib": "^0.10.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "nock": "^13.3.3",
+    "ioredis-mock": "^8.9.0",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "keywords": [
+    "api-gateway",
+    "microservices",
+    "notifications"
+  ],
+  "author": "",
+  "license": "ISC"
+}
