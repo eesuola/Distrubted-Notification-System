@@ -129,20 +129,22 @@ jobs:
     steps:
     - name: Request deployment server
       id: deploy-request
-      uses: peter-evans/create-or-update-comment@v3
+      uses: actions/github-script@v7
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        repository: ${{ github.repository }}
-        issue-number: ${{ github.run_number }}
-        body: |
-          /request-server
-          
-          **Deployment Information:**
-          - Commit: ${{ github.sha }}
-          - Branch: ${{ github.ref_name }}
-          - Services: ${{ needs.discover-services.outputs.services }}
-          - Registry: ${{ env.REGISTRY }}
-          - Image Tag: ${{ env.IMAGE_TAG }}
+        script: |
+          core.summary
+            .addRaw('/request-server\n\n')
+            .addHeading('Deployment Information', 3)
+            .addRaw(`
+              <ul>
+                <li><strong>Commit:</strong> ${context.sha}</li>
+                <li><strong>Branch:</strong> ${context.ref.replace('refs/heads/', '')}</li>
+                <li><strong>Services:</strong> ${needs.discover-services.outputs.services}</li>
+                <li><strong>Registry:</strong> ${process.env.REGISTRY}</li>
+                <li><strong>Image Tag:</strong> ${process.env.IMAGE_TAG}</li>
+              </ul>
+            `)
+            .write()
           
     - name: Wait for deployment
       run: |
@@ -163,41 +165,44 @@ jobs:
         
     - name: Notify deployment success
       if: success()
-      uses: peter-evans/create-or-update-comment@v3
+      uses: actions/github-script@v7
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        repository: ${{ github.repository }}
-        issue-number: ${{ github.run_number }}
-        body: |
-          ✅ **Deployment Successful**
-          
-          **Deployment Information:**
-          - Commit: ${{ github.sha }}
-          - Branch: ${{ github.ref_name }}
-          - Services: ${{ needs.discover-services.outputs.services }}
-          - Registry: ${{ env.REGISTRY }}
-          - Image Tag: ${{ env.IMAGE_TAG }}
-          - Status: All health checks passed
+        script: |
+          core.summary
+            .addRaw('✅ **Deployment Successful**\n\n')
+            .addHeading('Deployment Information', 3)
+            .addRaw(`
+              <ul>
+                <li><strong>Commit:</strong> ${context.sha}</li>
+                <li><strong>Branch:</strong> ${context.ref.replace('refs/heads/', '')}</li>
+                <li><strong>Services:</strong> ${needs.discover-services.outputs.services}</li>
+                <li><strong>Registry:</strong> ${process.env.REGISTRY}</li>
+                <li><strong>Image Tag:</strong> ${process.env.IMAGE_TAG}</li>
+                <li><strong>Status:</strong> All health checks passed</li>
+              </ul>
+            `)
+            .write()
           
     - name: Notify deployment failure
       if: failure()
-      uses: peter-evans/create-or-update-comment@v3
+      uses: actions/github-script@v7
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        repository: ${{ github.repository }}
-        issue-number: ${{ github.run_number }}
-        body: |
-          ❌ **Deployment Failed**
-          
-          **Deployment Information:**
-          - Commit: ${{ github.sha }}
-          - Branch: ${{ github.ref_name }}
-          - Services: ${{ needs.discover-services.outputs.services }}
-          - Registry: ${{ env.REGISTRY }}
-          - Image Tag: ${{ env.IMAGE_TAG }}
-          - Status: Health checks failed
-          
-          Please check the logs for more details.
+        script: |
+          core.summary
+            .addRaw('❌ **Deployment Failed**\n\n')
+            .addHeading('Deployment Information', 3)
+            .addRaw(`
+              <ul>
+                <li><strong>Commit:</strong> ${context.sha}</li>
+                <li><strong>Branch:</strong> ${context.ref.replace('refs/heads/', '')}</li>
+                <li><strong>Services:</strong> ${needs.discover-services.outputs.services}</li>
+                <li><strong>Registry:</strong> ${process.env.REGISTRY}</li>
+                <li><strong>Image Tag:</strong> ${process.env.IMAGE_TAG}</li>
+                <li><strong>Status:</strong> Health checks failed</li>
+              </ul>
+              <p><strong>Please check the logs for more details.</strong></p>
+            `)
+            .write()
 
   notify-failure:
     name: Notify on Failure
@@ -207,19 +212,22 @@ jobs:
     
     steps:
     - name: Notify failure
-      uses: peter-evans/create-or-update-comment@v3
+      uses: actions/github-script@v7
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        repository: ${{ github.repository }}
-        issue-number: ${{ github.run_number }}
-        body: |
-          ❌ **Pipeline Failed**
+        script: |
+          const failedStage = needs.deploy.result || needs.build-and-push.result || needs.test.result || needs.security-scan.result;
           
-          **Failed at stage:** ${{ needs.deploy.result || needs.build-and-push.result || needs.test.result || needs.security-scan.result }}
-          
-          **Pipeline Information:**
-          - Commit: ${{ github.sha }}
-          - Branch: ${{ github.ref_name }}
-          - Workflow Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          
-          Please check the logs for more details.
+          core.summary
+            .addRaw('❌ **Pipeline Failed**\n\n')
+            .addHeading('Failed at stage', 3)
+            .addRaw(`<p><strong>${failedStage}</strong></p>`)
+            .addHeading('Pipeline Information', 3)
+            .addRaw(`
+              <ul>
+                <li><strong>Commit:</strong> ${context.sha}</li>
+                <li><strong>Branch:</strong> ${context.ref.replace('refs/heads/', '')}</li>
+                <li><strong>Workflow Run:</strong> <a href="${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}">View Workflow</a></li>
+              </ul>
+              <p><strong>Please check the logs for more details.</strong></p>
+            `)
+            .write()
