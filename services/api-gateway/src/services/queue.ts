@@ -32,7 +32,7 @@ export interface PublishOptions {
 // Connection status interface
 export interface ConnectionStatus {
   connected: boolean;
-  connectionTime?: Date;
+  connectionTime?: Date | undefined;
   lastError?: Error;
   reconnectAttempts: number;
 }
@@ -51,6 +51,14 @@ export interface QueueConfig {
   heartbeat: number;
 }
 
+// Logger interface for type safety
+interface Logger {
+  info(message: string, ...args: any[]): void;
+  warn(message: string, ...args: any[]): void;
+  error(message: string, ...args: any[]): void;
+  debug(message: string, ...args: any[]): void;
+}
+
 /**
  * RabbitMQ client class for message queue operations
  */
@@ -58,13 +66,13 @@ export class RabbitMQClient {
   private connection: amqp.Connection | null = null;
   private channel: amqp.Channel | null = null;
   private config: QueueConfig;
-  private logger: any;
+  private logger: Logger;
   private reconnectAttempts: number = 0;
-  private reconnectTimer: any = null;
+  private reconnectTimer: NodeJS.Timeout | null = null;
   private isConnecting: boolean = false;
   private connectionTime: Date | null = null;
 
-  constructor(logger?: any) {
+  constructor(logger?: Logger) {
     this.config = {
       url: rabbitmq_config.url,
       exchange: rabbitmq_config.exchange,
@@ -123,7 +131,7 @@ export class RabbitMQClient {
         setTimeout(() => reject(new Error('Connection timeout')), this.config.connectionTimeout);
       });
 
-      this.connection = (await Promise.race([connectionPromise, timeoutPromise])) as unknown as amqp.Connection;
+      this.connection = await Promise.race([connectionPromise, timeoutPromise]) as unknown as amqp.Connection;
       
       // Reset reconnect attempts on successful connection
       this.reconnectAttempts = 0;
@@ -131,7 +139,7 @@ export class RabbitMQClient {
 
       // Handle connection errors
       if (this.connection) {
-        this.connection.on('error', (err: any) => {
+        this.connection.on('error', (err: Error) => {
           this.logger.error('RabbitMQ connection error:', err);
           if (err.message !== 'Connection closing') {
             this.attemptReconnect();
@@ -178,7 +186,7 @@ export class RabbitMQClient {
       await this.channel.assertExchange(this.config.exchange, this.config.exchangeType, { durable: true });
       
       // Assert queues with dead letter exchange
-      const emailQueueOptions = {
+      const emailQueueOptions: amqp.Options.AssertQueue = {
         durable: true,
         arguments: {
           'x-dead-letter-exchange': '',
@@ -186,7 +194,7 @@ export class RabbitMQClient {
         },
       };
       
-      const pushQueueOptions = {
+      const pushQueueOptions: amqp.Options.AssertQueue = {
         durable: true,
         arguments: {
           'x-dead-letter-exchange': '',
@@ -194,7 +202,7 @@ export class RabbitMQClient {
         },
       };
       
-      const failedQueueOptions = {
+      const failedQueueOptions: amqp.Options.AssertQueue = {
         durable: true,
       };
 
@@ -265,10 +273,10 @@ export class RabbitMQClient {
       };
 
       // Convert message to buffer
-      const buffer = (globalThis as any).Buffer.from(JSON.stringify(messageWithCorrelation));
+      const buffer = Buffer.from(JSON.stringify(messageWithCorrelation));
       
       // Default publish options
-      const publishOptions: PublishOptions = {
+      const publishOptions: amqp.Options.Publish = {
         persistent: true, // Make message persistent
         timestamp: Date.now(),
         ...options,
@@ -296,9 +304,9 @@ export class RabbitMQClient {
   getConnectionStatus(): ConnectionStatus {
     return {
       connected: !!(this.connection),
-      connectionTime: this.connectionTime || undefined,
+      ...(this.connectionTime && { connectionTime: this.connectionTime }),
       reconnectAttempts: this.reconnectAttempts,
-    } as ConnectionStatus;
+    };
   }
 
   /**
@@ -326,7 +334,6 @@ export class RabbitMQClient {
       }
       
       if (this.connection) {
-        // Cast to any to access the close method which exists but isn't in the type definition
         await (this.connection as any).close();
         this.connection = null;
       }
@@ -364,7 +371,7 @@ let rabbitMQClientInstance: RabbitMQClient | null = null;
  * @param logger - Optional logger instance
  * @returns RabbitMQ client instance
  */
-export function getRabbitMQClient(logger?: any): RabbitMQClient {
+export function getRabbitMQClient(logger?: Logger): RabbitMQClient {
   if (!rabbitMQClientInstance) {
     rabbitMQClientInstance = new RabbitMQClient(logger);
   }
