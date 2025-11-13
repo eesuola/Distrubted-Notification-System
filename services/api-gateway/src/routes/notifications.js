@@ -1,5 +1,5 @@
 import NotificationService from '../services/notificationService.js';
-import { createResponse } from '../../../shared/response.js';
+import { createResponse } from '../shared-response.js';
 
 // Notification routes
 async function notificationRoutes(fastify, options) {
