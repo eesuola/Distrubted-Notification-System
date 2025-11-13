@@ -11,7 +11,8 @@
     "test:rabbitmq": "node test-rabbitmq.js",
     "test:complete": "node test-complete-flow.js",
     "test:notifications": "node test-notifications.js",
-    "test:basic": "node test-basic.js"
+    "test:basic": "node test-basic.js",
+    "test:status": "node test-status-endpoint.js"
   },
   "dependencies": {
     "fastify": "^4.24.3",
@@ -19,7 +20,7 @@
     "@fastify/swagger-ui": "^2.0.0",
     "@fastify/jwt": "^7.2.4",
     "@fastify/redis": "^6.1.1",
-    "@fastify/ajv-errors": "^3.0.1",
+    "ajv-errors": "^3.0.0",
     "@fastify/cors": "^8.4.0",
     "consul": "^0.40.0",
     "amqplib": "^0.10.3",

@@ -1,11 +1,14 @@
 import fastify from 'fastify';
 import type { FastifyInstance } from 'fastify';
+import Ajv from 'ajv';
+import ajvErrors from 'ajv-errors';
 import consulPlugin from './plugins/consul.js';
 import correlationIdPlugin from './plugins/correlation-id.js';
 import rabbitmqPlugin from './plugins/rabbitmq.js';
 import redisPlugin from './plugins/redis.js';
 import authPlugin from './plugins/auth.js';
 import notificationRoutes from './routes/notifications.js';
+import statusRoutes from './routes/status.js';
 import { createResponse } from '@shared/response.js';
 import { service_config, logging_config } from './config.js';
 
@@ -16,6 +19,10 @@ declare const process: {
   exit(code?: number): never;
   on(event: string, listener: (...args: any[]) => void): void;
 };
+
+// Create AJV instance with error formatting
+const ajv = new Ajv({ allErrors: true });
+ajvErrors(ajv);
 
 // Create Fastify instance
 const server: FastifyInstance = fastify({
@@ -29,6 +36,9 @@ const server: FastifyInstance = fastify({
     timestamp: logging_config.include_timestamp,
   },
 });
+
+// Set AJV as the validator compiler
+server.setValidatorCompiler(({ schema }) => ajv.compile(schema));
 
 // Register plugins in the correct order
 async function registerPlugins(): Promise<void> {
@@ -52,6 +62,10 @@ async function registerPlugins(): Promise<void> {
     // Register notification routes after all plugins are loaded
     await server.register(notificationRoutes, { prefix: '/api/v1' });
     server.log.info('Notification routes registered');
+    
+    // Register status routes after all plugins are loaded
+    await server.register(statusRoutes);
+    server.log.info('Status routes registered');
     
     server.log.info('All plugins registered successfully');
   } catch (error) {

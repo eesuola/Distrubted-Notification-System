@@ -1,4 +1,6 @@
 import fastify from 'fastify';
+import Ajv from 'ajv';
+import ajvErrors from 'ajv-errors';
 import consulPlugin from './plugins/consul.js';
 import correlationIdPlugin from './plugins/correlation-id.js';
 import rabbitmqPlugin from './plugins/rabbitmq.js';
@@ -7,6 +9,10 @@ import authPlugin from './plugins/auth.js';
 import notificationRoutes from './routes/notifications.js';
 import { createResponse } from '../../../shared/response.js';
 import { service_config, logging_config } from './config.js';
+
+// Create AJV instance with error formatting
+const ajv = new Ajv({ allErrors: true });
+ajvErrors(ajv);
 
 // Create Fastify instance
 const server = fastify({
@@ -18,6 +24,9 @@ const server = fastify({
     pid: logging_config.include_pid,
   },
 });
+
+// Set AJV as the validator compiler
+server.setValidatorCompiler(({ schema }) => ajv.compile(schema));
 
 // Register plugins in the correct order
 async function registerPlugins() {
