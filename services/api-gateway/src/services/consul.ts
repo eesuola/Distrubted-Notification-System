@@ -3,8 +3,59 @@
  * Provides methods to interact with Consul for service registration and discovery
  */
 
-import * as consul from 'consul';
+import * as Consul from 'consul';
 import { consul_config, service_config } from '../config.js';
+
+// Define proper types for Consul API responses
+interface ConsulServiceNode {
+  Node?: {
+    Node: string;
+    Address: string;
+  };
+  Service?: {
+    ID: string;
+    Service: string;
+    Tags?: string[];
+    Address: string;
+    Port: number;
+    Meta?: Record<string, string>;
+  };
+  Checks?: Array<{
+    Node: string;
+    CheckID: string;
+    Name: string;
+    Status: string;
+    ServiceID?: string;
+    ServiceName?: string;
+  }>;
+}
+
+interface ConsulHealthServiceNode {
+  Node: {
+    ID: string;
+    Node: string;
+    Address: string;
+    Datacenter: string;
+    TaggedAddresses: Record<string, string>;
+    Meta: Record<string, string>;
+  };
+  Service: {
+    ID: string;
+    Service: string;
+    Tags?: string[];
+    Address: string;
+    Port: number;
+    Meta?: Record<string, string>;
+  };
+  Checks: Array<{
+    Node: string;
+    CheckID: string;
+    Name: string;
+    Status: string;
+    ServiceID?: string;
+    ServiceName?: string;
+  }>;
+}
 
 // Service instance interface
 export interface ServiceInstance {
@@ -51,13 +102,13 @@ export interface ServiceRegistrationConfig {
  * Consul client class for service discovery
  */
 export class ConsulClient {
-  private client: consul.Consul;
+  private client: Consul.Consul;
   private logger: any;
 
   constructor(logger?: any) {
-    this.client = consul({
+    this.client = new (Consul as any).default({
       host: consul_config.host,
-      port: consul_config.port,
+      port: consul_config.port.toString(),
       promisify: true,
     });
     this.logger = logger || console;
@@ -71,16 +122,19 @@ export class ConsulClient {
    */
   async getServiceUrl(serviceName: string): Promise<string> {
     try {
-      const services = await this.client.catalog.service.nodes(serviceName);
+      const result = await this.client.catalog.service.nodes(serviceName);
+      
+      // Type the result as an array of service nodes
+      const services = Array.isArray(result) ? result as ConsulServiceNode[] : [];
       
       if (!services || services.length === 0) {
         throw new Error(`Service ${serviceName} not found in Consul`);
       }
 
       // Filter for healthy services only
-      const healthyServices = services.filter((service: any) => {
+      const healthyServices = services.filter((service: ConsulServiceNode) => {
         // Check if service has passing health checks
-        return service.ServiceMeta?.health !== 'unhealthy';
+        return service.Service?.Meta?.health !== 'unhealthy';
       });
 
       if (healthyServices.length === 0) {
@@ -89,9 +143,13 @@ export class ConsulClient {
 
       // Return the first available healthy service instance
       const service = healthyServices[0];
-      const protocol = service.ServiceMeta?.protocol || 'http';
-      const port = service.ServicePort;
-      const address = service.ServiceAddress || service.Address;
+      if (!service || !service.Service) {
+        throw new Error(`Invalid service data for ${serviceName}`);
+      }
+      
+      const protocol = service.Service.Meta?.protocol || 'http';
+      const port = service.Service.Port;
+      const address = service.Service.Address || service.Node?.Address || '';
 
       return `${protocol}://${address}:${port}`;
     } catch (error) {
@@ -107,25 +165,32 @@ export class ConsulClient {
    */
   async getAllServiceInstances(serviceName: string): Promise<ServiceInstance[]> {
     try {
-      const services = await this.client.catalog.service.nodes(serviceName);
+      const result = await this.client.catalog.service.nodes(serviceName);
+      
+      // Type the result as an array of service nodes
+      const services = Array.isArray(result) ? result as ConsulServiceNode[] : [];
       
       if (!services || services.length === 0) {
         return [];
       }
 
-      return services.map((service: any) => {
-        const protocol = service.ServiceMeta?.protocol || 'http';
-        const port = service.ServicePort;
-        const address = service.ServiceAddress || service.Address;
+      return services.map((service: ConsulServiceNode) => {
+        if (!service || !service.Service) {
+          throw new Error('Invalid service data');
+        }
+        
+        const protocol = service.Service.Meta?.protocol || 'http';
+        const port = service.Service.Port;
+        const address = service.Service.Address || service.Node?.Address || '';
 
         return {
-          id: service.ServiceID,
-          name: service.ServiceName,
-          address: service.ServiceAddress || service.Address,
-          port: service.ServicePort,
+          id: service.Service.ID,
+          name: service.Service.Service,
+          address: address,
+          port: port,
           url: `${protocol}://${address}:${port}`,
-          health: service.ServiceMeta?.health || 'unknown',
-          metadata: service.ServiceMeta || {},
+          health: service.Service.Meta?.health || 'unknown',
+          metadata: service.Service.Meta || {},
         };
       });
     } catch (error) {
@@ -188,25 +253,28 @@ export class ConsulClient {
    */
   async checkServiceHealth(serviceName: string): Promise<ServiceHealthResult> {
     try {
-      const checks = await this.client.health.service(serviceName);
+      const result = await this.client.health.service(serviceName);
+      
+      // Type the result as an array of health service entries
+      const checks = Array.isArray(result) ? result as ConsulHealthServiceNode[] : [];
       
       if (!checks || checks.length === 0) {
         return { healthy: false, totalInstances: 0, healthyInstances: 0, instances: [] };
       }
 
-      const healthyChecks = checks.filter((check: any) =>
-        check.Checks.every((c: any) => c.Status === 'passing')
+      const healthyChecks = checks.filter((check: ConsulHealthServiceNode) =>
+        check.Checks.every((c) => c.Status === 'passing')
       );
 
       return {
         healthy: healthyChecks.length > 0,
         totalInstances: checks.length,
         healthyInstances: healthyChecks.length,
-        instances: checks.map((check: any) => ({
-          id: check.Node.Service.ID,
-          address: check.Node.Service.Address,
-          port: check.Node.Service.Port,
-          status: check.Checks.map((c: any) => ({ name: c.Name, status: c.Status })),
+        instances: checks.map((check: ConsulHealthServiceNode) => ({
+          id: check.Service.ID,
+          address: check.Service.Address,
+          port: check.Service.Port,
+          status: check.Checks.map((c) => ({ name: c.Name, status: c.Status })),
         })),
       };
     } catch (error) {
@@ -219,7 +287,7 @@ export class ConsulClient {
    * Get the raw Consul client for advanced operations
    * @returns The underlying Consul client
    */
-  getRawClient(): consul.Consul {
+  getRawClient(): Consul.Consul {
     return this.client;
   }
 }

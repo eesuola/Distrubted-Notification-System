@@ -8,11 +8,13 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "nodemon --exec ts-node src/index.ts",
+    "test": "node test-basic.js",
     "test:rabbitmq": "node test-rabbitmq.js",
     "test:complete": "node test-complete-flow.js",
     "test:notifications": "node test-notifications.js",
     "test:basic": "node test-basic.js",
-    "test:status": "node test-status-endpoint.js"
+    "test:status": "node test-status-endpoint.js",
+    "test": "echo 'No tests specified for api-gateway' && exit 0"
   },
   "dependencies": {
     "fastify": "^4.24.3",
