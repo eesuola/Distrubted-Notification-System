@@ -55,7 +55,7 @@ export class ConsulClient {
   private logger: any;
 
   constructor(logger?: any) {
-    this.client = consul({
+    this.client = new (consul as any).default({
       host: consul_config.host,
       port: consul_config.port,
       promisify: true,
@@ -71,7 +71,10 @@ export class ConsulClient {
    */
   async getServiceUrl(serviceName: string): Promise<string> {
     try {
-      const services = await this.client.catalog.service.nodes(serviceName);
+      const result = await this.client.catalog.service.nodes(serviceName);
+      
+      // The Consul client returns an object with a 'Service' property containing the array
+      const services = Array.isArray(result) ? result : (result as any).Service || [];
       
       if (!services || services.length === 0) {
         throw new Error(`Service ${serviceName} not found in Consul`);
@@ -107,7 +110,10 @@ export class ConsulClient {
    */
   async getAllServiceInstances(serviceName: string): Promise<ServiceInstance[]> {
     try {
-      const services = await this.client.catalog.service.nodes(serviceName);
+      const result = await this.client.catalog.service.nodes(serviceName);
+      
+      // The Consul client returns an object with a 'Service' property containing the array
+      const services = Array.isArray(result) ? result : (result as any).Service || [];
       
       if (!services || services.length === 0) {
         return [];
@@ -188,7 +194,10 @@ export class ConsulClient {
    */
   async checkServiceHealth(serviceName: string): Promise<ServiceHealthResult> {
     try {
-      const checks = await this.client.health.service(serviceName);
+      const result = await this.client.health.service(serviceName);
+      
+      // The Consul client returns an object with a 'Service' property containing the array
+      const checks = Array.isArray(result) ? result : (result as any).Service || [];
       
       if (!checks || checks.length === 0) {
         return { healthy: false, totalInstances: 0, healthyInstances: 0, instances: [] };

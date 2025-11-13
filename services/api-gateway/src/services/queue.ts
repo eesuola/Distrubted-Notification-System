@@ -103,7 +103,7 @@ export class RabbitMQClient {
       });
     }
 
-    if (this.connection && this.connection.connection && this.connection.connection.serverProperties) {
+    if (this.connection) {
       return this.connection;
     }
 
@@ -123,33 +123,40 @@ export class RabbitMQClient {
         setTimeout(() => reject(new Error('Connection timeout')), this.config.connectionTimeout);
       });
 
-      this.connection = await Promise.race([connectionPromise, timeoutPromise]);
+      this.connection = (await Promise.race([connectionPromise, timeoutPromise])) as unknown as amqp.Connection;
       
       // Reset reconnect attempts on successful connection
       this.reconnectAttempts = 0;
       this.connectionTime = new Date();
 
       // Handle connection errors
-      this.connection.on('error', (err: any) => {
-        this.logger.error('RabbitMQ connection error:', err);
-        if (err.message !== 'Connection closing') {
+      if (this.connection) {
+        this.connection.on('error', (err: any) => {
+          this.logger.error('RabbitMQ connection error:', err);
+          if (err.message !== 'Connection closing') {
+            this.attemptReconnect();
+          }
+        });
+
+        this.connection.on('close', () => {
+          this.logger.warn('RabbitMQ connection closed');
           this.attemptReconnect();
-        }
-      });
+        });
 
-      this.connection.on('close', () => {
-        this.logger.warn('RabbitMQ connection closed');
-        this.attemptReconnect();
-      });
-
-      // Create channel
-      this.channel = await this.connection.createChannel();
+        // Create channel
+        this.channel = await (this.connection as any).createChannel();
+      }
       
       // Setup exchanges and queues
       await this.setupQueues();
       
       this.logger.info('RabbitMQ connection established successfully');
       this.isConnecting = false;
+      
+      if (!this.connection) {
+        throw new Error('Failed to establish RabbitMQ connection');
+      }
+      
       return this.connection;
     } catch (error) {
       this.logger.error('Failed to connect to RabbitMQ:', error);
@@ -288,7 +295,7 @@ export class RabbitMQClient {
    */
   getConnectionStatus(): ConnectionStatus {
     return {
-      connected: !!(this.connection && this.connection.connection && this.connection.connection.serverProperties),
+      connected: !!(this.connection),
       connectionTime: this.connectionTime || undefined,
       reconnectAttempts: this.reconnectAttempts,
     } as ConnectionStatus;
@@ -319,7 +326,8 @@ export class RabbitMQClient {
       }
       
       if (this.connection) {
-        await this.connection.close();
+        // Cast to any to access the close method which exists but isn't in the type definition
+        await (this.connection as any).close();
         this.connection = null;
       }
       
