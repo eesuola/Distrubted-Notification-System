@@ -41,3 +41,4 @@ coverage/
 TEST_COMPLETE_FLOW.md
 RABBITMQ_PLUGIN.md
 DEPENDENCY_REPORT.md
+distributed-notification-system-architecture.md
