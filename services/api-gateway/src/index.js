@@ -7,7 +7,7 @@ import rabbitmqPlugin from './plugins/rabbitmq.js';
 import redisPlugin from './plugins/redis.js';
 import authPlugin from './plugins/auth.js';
 import notificationRoutes from './routes/notifications.js';
-import { createResponse } from '../../../shared/response.js';
+import { createResponse } from './shared-response.js';
 import { service_config, logging_config } from './config.js';
 
 // Create AJV instance with error formatting

@@ -285,6 +285,37 @@ Each service includes a Dockerfile for containerization:
 
 The project includes CI/CD workflows for automated deployment. See `.github/workflows/deploy.yml` for details.
 
+## Dependency Management
+
+This project uses npm workspaces to manage dependencies across all services. If you encounter dependency issues:
+
+### Fixing Dependency Issues
+
+1. **Automated Fix**:
+   ```bash
+   # For Unix/Linux/macOS
+   ./fix-dependencies.sh
+   
+   # For Windows
+   fix-dependencies.bat
+   ```
+
+2. **Manual Fix**:
+   ```bash
+   rm -f package-lock.json
+   rm -rf node_modules
+   rm -rf services/*/node_modules
+   npm install
+   npm run build
+   ```
+
+3. **Verify Dependencies**:
+   ```bash
+   node verify-dependencies.js
+   ```
+
+For detailed information about dependency issues and fixes, see [DEPENDENCY_FIX_README.md](./DEPENDENCY_FIX_README.md).
+
 ## Contributing
 
 When contributing to the notification service:

@@ -1,4 +1,4 @@
-import { createResponse } from '../../../shared/response.js';
+import { createResponse } from '../shared-response.js';
 
 class NotificationService {
   constructor(fastify) {

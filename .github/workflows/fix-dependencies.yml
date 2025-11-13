@@ -1,0 +1,46 @@
+name: Fix Dependencies
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  fix-dependencies:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Clean up existing lock files and node_modules
+      run: |
+        rm -f package-lock.json
+        rm -rf node_modules
+        rm -rf services/*/node_modules
+        
+    - name: Install dependencies
+      run: npm install
+      
+    - name: Build all services
+      run: npm run build
+      
+    - name: Run tests
+      run: npm test
+      
+    - name: Commit updated lock file
+      if: github.event_name == 'workflow_dispatch'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add package-lock.json
+        git commit -m "fix: update package-lock.json to resolve dependency issues" || exit 0
+        git push
