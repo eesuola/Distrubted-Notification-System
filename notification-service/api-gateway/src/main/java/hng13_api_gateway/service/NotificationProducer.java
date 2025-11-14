@@ -1,6 +1,7 @@
 package hng13_api_gateway.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import hng13_api_gateway.model.dto.NotificationMessage;
 import hng13_api_gateway.model.dto.NotificationRequest;
 import hng13_api_gateway.utils.RabbitConstants;
 import lombok.RequiredArgsConstructor;
@@ -18,29 +19,15 @@ public class NotificationProducer {
 
     private static final Logger log = LoggerFactory.getLogger(NotificationProducer.class);
 
-
-    /**
-     * send an email notification to the email exchange/queue
-     */
-    public void sendEmail(NotificationRequest request) {
-       sendMessage(request, RabbitConstants.EMAIL_ROUTING_KEY, "Email");
-    }
-
-    /**
-     * send a push notification to the push exchange/queue
-     */
-    public void sendPush(NotificationRequest request) {
-       sendMessage(request, RabbitConstants.PUSH_ROUTING_KEY, "Push");
-    }
-
-    private void sendMessage(NotificationRequest request, String routingKey, String type) {
+    public void publish(NotificationMessage msg) {
         try {
-            String payload = objectMapper.writeValueAsString(request);
+            String payload = objectMapper.writeValueAsString(msg);
+            String routingKey = "email".equals(msg.getType()) ? RabbitConstants.EMAIL_ROUTING_KEY : RabbitConstants.PUSH_ROUTING_KEY;
             rabbitTemplate.convertAndSend(RabbitConstants.NOTIFICATIONS_EXCHANGE, routingKey, payload);
-            log.info("Queued {} notification [{}] for user [{}]", type, request.getNotificationId(), payload);
-        } catch (Exception e) {
-            log.error("Failed to queue {} notification [{}]: {}", type, request.getNotificationId(), e.getMessage(), e);
-            rabbitTemplate.convertAndSend(RabbitConstants.NOTIFICATIONS_EXCHANGE, RabbitConstants.FAILED_ROUTING_KEY, request);
+            log.info("Queued {} notification [{}] for user {}", msg.getType(), msg.getCorrelationId(), msg.getUserId());
+        } catch (Exception ex) {
+            log.error("Failed to publish notification {}: {}", msg.getCorrelationId(), ex.getMessage(), ex);
+            rabbitTemplate.convertAndSend(RabbitConstants.NOTIFICATIONS_EXCHANGE, RabbitConstants.FAILED_ROUTING_KEY, msg);
         }
     }
 }

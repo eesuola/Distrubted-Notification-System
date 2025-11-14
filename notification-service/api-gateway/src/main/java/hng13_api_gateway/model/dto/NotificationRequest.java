@@ -8,10 +8,11 @@ import java.util.Map;
 @Data
 @Builder
 public class NotificationRequest {
-    private String type;
-    private String userId;
-    private String templateId;
+    private String notification_type;
+    private String user_id;
+    private String template_code;
     private Map<String, Object> variables;
+    private String request_id;
     private Integer priority;
-    private String notificationId;
+    private Map<String, Object> metadata;
 }

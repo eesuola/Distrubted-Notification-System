@@ -14,6 +14,7 @@ public class NotificationMessage {
     private String userId;
     private String templateId;
     private Map<String, Object> variables;
+    private Map<String, Object> metadata;
     private Object to;
     private Integer priority;
     private Instant createdAt;

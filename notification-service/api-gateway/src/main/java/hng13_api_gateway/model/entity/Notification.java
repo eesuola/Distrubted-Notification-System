@@ -23,12 +23,13 @@ public class Notification {
 
     private String userId;
     private String type;
-    private String status;
-    private int attempts;
+    private String templateCode;
 
     @Column(columnDefinition = "jsonb")
     private String payload;
 
+    private String status;
+    private Integer attempts;
     private Instant createdAt;
     private Instant updatedAt;
 }

@@ -9,8 +9,18 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
-    volumnes:
-      - rabbimq_data:/var/lib/rabbitmq
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - notification_net
+
+  consul:
+    image: consul:1.15
+    container_name: consul
+    command: agent -dev -client=0.0.0.0 -ui
+    ports:
+      - "8500:8500"   # UI + API
+      - "8600:8600/udp"
     networks:
       - notification_net
 

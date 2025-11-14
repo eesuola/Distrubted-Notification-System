@@ -1,5 +1,6 @@
 package hng13_api_gateway.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import hng13_api_gateway.client.UserClient;
 import hng13_api_gateway.model.dto.NotificationMessage;
 import hng13_api_gateway.model.dto.NotificationRequest;
@@ -21,50 +22,58 @@ public class NotificationService {
     private final NotificationProducer producer;
     private final NotificationRepository repository;
     private final IdempotencyService idempotencyService;
+    private final ObjectMapper mapper;
 
     public Mono<String> createAndPublish(NotificationRequest req, String idempotencyKey) {
-        if (req.getType() == null || (!req.getType().equalsIgnoreCase("email")
-                && !req.getType().equalsIgnoreCase("push"))) {
-            return Mono.error(new IllegalArgumentException("type must be 'email' or 'push'"));
+        if (req.getNotification_type() == null || (!req.getNotification_type().equalsIgnoreCase("email")
+                && !req.getNotification_type().equalsIgnoreCase("push"))) {
+            return Mono.error(new IllegalArgumentException("Notification_type must be 'email' or 'push'"));
         }
 
-        String correlationId = UUID.randomUUID().toString();
+        String correlationId = req.getRequest_id() != null ? req.getRequest_id() : UUID.randomUUID().toString();
 
         String existing = idempotencyService.reserveIfAbsent(idempotencyKey == null ? "NONE": idempotencyKey, correlationId);
         if (existing != null) {
             return Mono.just(existing);
         }
 
-        return userClient.getUserInfo(req.getUserId())
+        return userClient.getUserInfo(req.getUser_id())
                 .switchIfEmpty(Mono.error(new RuntimeException("User not found")))
                 .flatMap(userInfo -> {
                     NotificationMessage msg = NotificationMessage.builder()
                             .correlationId(correlationId)
-                            .type(req.getType())
-                            .userId(req.getUserId())
-                            .templateId(req.getTemplateId())
+                            .type(req.getNotification_type())
+                            .userId(req.getUser_id())
+                            .templateId(req.getTemplate_code())
                             .variables(req.getVariables())
                             .createdAt(Instant.now())
                             .priority(req.getPriority())
+                            .metadata(req.getMetadata())
                             .build();
 
-                    if ("email".equalsIgnoreCase(req.getType())) {
+                    if ("email".equalsIgnoreCase(req.getNotification_type())) {
                         msg.setTo(userInfo.email());
-                        producer.sendEmail(req);
                     } else {
-                        msg.setTo(userInfo.pushTokens());
-                        producer.sendPush(req);
+                        msg.setTo(userInfo.push_tokens());
                     }
 
                     Notification notification = new Notification();
                     notification.setCorrelationId(correlationId);
-                    notification.setUserId(req.getUserId());
-                    notification.setType(req.getType().toUpperCase());
+                    notification.setUserId(req.getUser_id());
+                    notification.setType(req.getNotification_type().toUpperCase());
                     notification.setStatus("QUEUED");
+                    notification.setAttempts(0);
                     notification.setCreatedAt(Instant.now());
                     notification.setUpdatedAt(Instant.now());
 
+                    try {
+                        notification.setPayload(mapper.writeValueAsString(req));
+                    } catch (Exception ex) {
+                        notification.setPayload("{}");
+                    }
+
                     return Mono.fromCallable(() -> repository.save(notification))
+                            .doOnNext(saved -> producer.publish(msg))
                             .thenReturn(correlationId);
                 })
                 .onErrorResume(err -> Mono.error(new RuntimeException("Failed to create notification." + err.getMessage())));

@@ -1,10 +1,12 @@
 spring:
   application:
     name: api-gateway
+
   datasource:
-    url: jdbc:postgresql:${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:api-gateway}
-    username: ${DB_USER:postgres}
-    password: ${DB_PASS:password}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:notifications_db}
+    username: ${DB_USER:notification_user}
+    password: ${DB_PASS:strongpassword}
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -34,11 +36,7 @@ server:
   port: ${PORT:8080}
 
 security:
-  oauth2:
-    resourceserver:
-      jwt:
-        jwt-set-uri: ${JWK_SET_URI:http://localhost:8080/realms/myrealm/protocol/openid-connect/certs}
-        issuer-uri: ${JWT_ISSUER_URI:http://localhost:8080/realms/myrealm}
+  jwt-secret: ${JWT_TOKEN:notaverysecuredtoken}
 
 resilience4j:
   circuitbreaker:
@@ -48,6 +46,9 @@ resilience4j:
         failureRateThreshold: 50
         waitDurationInOpenState: 30s
         permittedNumberOfCallsInHalfOpenState: 5
+      instances:
+        userService:
+          baseConfig: default
   retry:
     instances:
       userClient:

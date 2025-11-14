@@ -1,34 +1,50 @@
 package hng13_api_gateway.client;
 
-import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cloud.client.loadbalancer.LoadBalanced;
-import org.springframework.context.annotation.Bean;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import org.springframework.cloud.client.discovery.ReactiveDiscoveryClient;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 @Component
-@RequiredArgsConstructor
 public class UserClient {
 
-    @Value("${user.service.basepath:/v1/users}")
-    private String basePath;
-
     private final WebClient webClient;
+    private final ReactiveDiscoveryClient discoveryClient;
 
-    @Bean
-    @LoadBalanced
-    public WebClient loadBalanceWebClient(WebClient.Builder builder) {
-        return builder.build();
+    public UserClient(WebClient.Builder wc, ReactiveDiscoveryClient discoveryClient) {
+        this.webClient = wc.build();
+        this.discoveryClient = discoveryClient;
     }
 
+    @CircuitBreaker(name = "userService", fallbackMethod = "userFallback")
     public Mono<UserInfo> getUserInfo(String userId) {
-        return webClient.get()
-                .uri("http://user-service" + basePath + "/" + userId)
+        return discoveryClient.getInstances("user-service")
+                        .next()
+                                .flatMap(instance -> webClient.get()
+                .uri("http://user-service/api/v1/users/{id}", userId)
                 .retrieve()
-                .bodyToMono(UserInfo.class);
+                .bodyToMono(UserInfo.class));
     }
 
-    public record UserInfo(String userId, String email, String[] pushTokens, boolean emailEnabled, boolean pushEnabled) {}
+    @CircuitBreaker(name = "userService", fallbackMethod = "fallbackResponse")
+    public Mono<String> forwardToUserService(String path, Object requestBody) {
+        return discoveryClient.getInstances("user-service")
+                .next()
+                .flatMap(instance -> webClient.post()
+                        .uri(instance.getUri() + path)
+                        .bodyValue(requestBody)
+                        .retrieve()
+                        .bodyToMono(String.class));
+    }
+
+    private Mono<String> fallbackResponse(String path, Object requestBody, Throwable ex) {
+        return Mono.error(new RuntimeException("User service unavailable"));
+    }
+
+    private Mono<UserInfo> userFallback(String userId, Throwable t) {
+        return Mono.error(new RuntimeException("User service unavailable"));
+    }
+
+    public record UserInfo(String user_id, String email, String[] push_tokens, boolean email_enabled, boolean push_enabled) {}
 }
