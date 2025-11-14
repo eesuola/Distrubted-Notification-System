@@ -1,0 +1,17 @@
+{
+  "name": "email-service",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "email-service.js",
+  "scripts": {
+    "start": "node email-service.js",
+    "dev": "node --watch email-service.js"
+  },
+  "dependencies": {
+    "@sendgrid/mail": "^8.1.0",
+    "amqplib": "^0.10.3",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "fastify": "^4.25.0"
+  }
+}
